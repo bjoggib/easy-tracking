@@ -137,7 +137,7 @@ export function FoodEditor({ id }: { id?: string }) {
         <Link className="btn quiet" href="/foods">‹ My foods</Link>
       </div>
       <div className="row">
-        {existing?.image && <FoodThumb src={existing.image} size={72} />}
+        {existing?.image && <FoodThumb src={existing.image} size={72} zoomable alt={foodLabel(existing)} />}
         <h2>{existing ? 'Edit food' : 'New food'}</h2>
       </div>
       {!existing && (
