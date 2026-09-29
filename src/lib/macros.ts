@@ -1,11 +1,16 @@
-import type { AppData, DayEntry, DayLog, Ingredient, Macros, Recipe, WeightEntry } from './types';
+import type { AppData, DayEntry, DayLog, Macros, Recipe, WeightEntry } from './types';
 import { addDays } from './dates';
 
-export const MACRO_KEYS = ['kcal', 'p', 'c', 'f'] as const;
-const zero = (): Macros & { g: number } => ({ g: 0, kcal: 0, p: 0, c: 0, f: 0 });
+export const MACRO_KEYS = ['kcal', 'p', 'c', 'f', 'sugar', 'fibre', 'salt'] as const;
+export type MacroKey = (typeof MACRO_KEYS)[number];
+export const MACRO_LABELS: Record<MacroKey, string> = {
+  kcal: 'kcal', p: 'Protein', c: 'Carbs', f: 'Fat', sugar: 'Sugar', fibre: 'Fibre', salt: 'Salt',
+};
+export const zeroMacros = (): Macros => ({ kcal: 0, p: 0, c: 0, f: 0, sugar: 0, fibre: 0, salt: 0 });
+const zero = (): Macros & { g: number } => ({ g: 0, ...zeroMacros() });
 
-type IngredientLike = { grams: number | string; kcal: number | string; p: number | string; c: number | string; f: number | string };
-const n = (v: number | string) => {
+type IngredientLike = { grams: number | string } & Partial<Record<MacroKey, number | string>>;
+const n = (v: number | string | undefined) => {
   const x = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.'));
   return Number.isFinite(x) ? x : 0;
 };
@@ -23,27 +28,36 @@ export function recipeTotals(ingredients: IngredientLike[]) {
 export function perServing(r: Pick<Recipe, 'ingredients' | 'servings'>) {
   const t = recipeTotals(r.ingredients);
   const s = r.servings > 0 ? r.servings : 1;
-  return { g: t.g / s, kcal: t.kcal / s, p: t.p / s, c: t.c / s, f: t.f / s };
+  return scale(t, 1 / s);
+}
+
+/** Multiplies grams and every macro by `factor`. */
+export function scale<T extends Macros & { g: number }>(m: T, factor: number): Macros & { g: number } {
+  const out = { g: m.g * factor, ...zeroMacros() };
+  for (const k of MACRO_KEYS) out[k] = n(m[k]) * factor;
+  return out;
+}
+
+/** Macros for `grams` of a food whose values are per 100 g. */
+export function forAmount(per100: Partial<Macros>, grams: number): Macros & { g: number } {
+  const out = { g: grams, ...zeroMacros() };
+  for (const k of MACRO_KEYS) out[k] = (n(per100[k]) * grams) / 100;
+  return out;
 }
 
 export function entryInfo(e: DayEntry, recipes: AppData['recipes']) {
   const r = e.recipeId ? recipes[e.recipeId] : undefined;
-  const base = r ? perServing(r) : { g: e.snap.g ?? 0, kcal: e.snap.kcal, p: e.snap.p, c: e.snap.c, f: e.snap.f };
-  const s = e.servings || 0;
+  const base = r ? perServing(r) : { ...e.snap, g: e.snap.g ?? 0 };
   return {
-    name: r ? r.name : e.snap.name || 'Removed recipe',
+    name: r ? r.name : e.snap.name || 'Removed meal',
     quick: !e.recipeId,
     gone: !!e.recipeId && !r,
-    g: base.g * s,
-    kcal: base.kcal * s,
-    p: base.p * s,
-    c: base.c * s,
-    f: base.f * s,
+    ...scale(base, e.servings || 0),
   };
 }
 
 export function dayTotals(day: DayLog | undefined, recipes: AppData['recipes']): Macros {
-  const t: Macros = { kcal: 0, p: 0, c: 0, f: 0 };
+  const t = zeroMacros();
   for (const e of day?.entries ?? []) {
     const m = entryInfo(e, recipes);
     for (const k of MACRO_KEYS) t[k] += m[k];
@@ -66,12 +80,6 @@ export function rolling(weights: Record<string, WeightEntry>, k: string) {
     if (a != null) { s += a; count++; }
   }
   return count ? { avg: s / count, n: count } : null;
-}
-
-export function knownIngredients(recipes: AppData['recipes']) {
-  const m: Record<string, Ingredient> = {};
-  for (const r of Object.values(recipes)) for (const i of r.ingredients) if (i.name) m[i.name.trim().toLowerCase()] = i;
-  return m;
 }
 
 export function lastUsed(days: AppData['days']) {

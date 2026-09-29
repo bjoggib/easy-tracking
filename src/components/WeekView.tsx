@@ -2,9 +2,12 @@
 
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
-import { addDays, fmtLong, fmtShort, fmtWeekRange, fmtWeekday, todayKey, weekStart } from '@/lib/dates';
+import { addDays, fmtLong, fmtWeekRange, fmtWeekday, parseKey, todayKey, weekStart } from '@/lib/dates';
 import { kg, r0, signed } from '@/lib/format';
-import { dailyAvg, dayTotals } from '@/lib/macros';
+import { dailyAvg, dayTotals, entryInfo } from '@/lib/macros';
+
+/** Entries listed per day before the rest collapse into "+N more". */
+const MAX_ITEMS = 5;
 
 const mean = (a: number[]) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : null);
 
@@ -67,29 +70,44 @@ export function WeekView({ start }: { start: string }) {
         </div>
       </div>
 
-      <ul className="wlist">
-        {rows.map(({ k, t, n, w }) => {
-          const seg = (v: number, c: string) => <i style={{ width: `${(v / scale) * 100}%`, background: `var(${c})` }} />;
-          return (
-            <li key={k}>
-              <Link href={`/day?date=${k}`} className={`wrow ${k === today ? 'today' : ''} ${k > today ? 'future' : ''}`} aria-label={`Open ${fmtLong(k)}`}>
-                <span className="wd"><b>{k === today ? 'Today' : fmtWeekday(k)}</b><small>{fmtShort(k)}</small></span>
-                <span className="wbar">
-                  <span className="fill">{n ? <>{seg(t.p * 4, '--p')}{seg(t.c * 4, '--c')}{seg(t.f * 9, '--f')}</> : null}</span>
-                  {tgt ? <span className="tgt" style={{ left: `${(tgt / scale) * 100}%` }} /> : null}
-                </span>
-                <span className="wk">{n ? r0(t.kcal) : '—'}<small>kcal</small></span>
-                <span className="wm">
-                  {n ? (
-                    <><span className={tp && t.p >= tp ? 'hit' : ''}>{r0(t.p)} g protein</span>, {r0(t.c)} g carbs, {r0(t.f)} g fat</>
-                  ) : k > today ? 'Upcoming' : 'Nothing logged'}
-                  {w != null ? `. Weight ${w.toFixed(2)} kg` : ''}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="calbox">
+        <ol className="cal">
+          {rows.map(({ k, t, n, w }) => {
+            const seg = (v: number, c: string) => <i style={{ width: `${(v / scale) * 100}%`, background: `var(${c})` }} />;
+            const items = (data.days[k]?.entries ?? []).map(e => ({ id: e.id, ...entryInfo(e, data.recipes) }));
+            const shown = items.length > MAX_ITEMS ? items.slice(0, MAX_ITEMS - 1) : items;
+            return (
+              <li key={k}>
+                <Link href={`/day?date=${k}`} className={`cday ${k === today ? 'today' : ''} ${k > today ? 'future' : ''}`} aria-label={`Open ${fmtLong(k)}`}>
+                  <span className="ch"><small>{fmtWeekday(k)}</small><b>{parseKey(k).getDate()}</b></span>
+                  <span className="cev">
+                    {shown.map(e => (
+                      <span key={e.id} className="ev"><span>{e.name}</span><small>{r0(e.kcal)} kcal</small></span>
+                    ))}
+                    {items.length > shown.length && <span className="ev more">+{items.length - shown.length} more</span>}
+                    {!n && <span className="cnone">{k > today ? 'Upcoming' : 'Nothing logged'}</span>}
+                  </span>
+                  {n || w != null ? (
+                    <span className="cft">
+                      {n ? (
+                        <>
+                          <span className="ck">{r0(t.kcal)} <small>kcal</small></span>
+                          <span className="wbar">
+                            <span className="fill">{seg(t.p * 4, '--p')}{seg(t.c * 4, '--c')}{seg(t.f * 9, '--f')}</span>
+                            {tgt ? <span className="tgt" style={{ left: `${(tgt / scale) * 100}%` }} /> : null}
+                          </span>
+                          <span className={tp && t.p >= tp ? 'hit' : ''}>{r0(t.p)} g protein</span>
+                        </>
+                      ) : null}
+                      {w != null && <span>{w.toFixed(2)} kg</span>}
+                    </span>
+                  ) : null}
+                </Link>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
       <p className="hint">
         Averages count only days with food logged. The line on each bar marks your calorie target; protein turns blue on days you hit its target.
         Select a day to open it.

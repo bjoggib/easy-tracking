@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useOptionalStore } from '@/lib/store';
+import { supabase, usingSupabase } from '@/lib/supabase';
 
-const LINKS = [
+const LINKS: { href: string; label: string; also?: string }[] = [
   { href: '/day', label: 'Day' },
   { href: '/week', label: 'Week' },
-  { href: '/recipes', label: 'Recipes' },
+  { href: '/meals', label: 'My meals', also: '/foods' },
   { href: '/weight', label: 'Weight' },
 ];
 
@@ -17,12 +18,20 @@ export function Header() {
   return (
     <header className="site">
       <div className="head">
-        <Link href="/day" className="brand">Plate &amp; Scale</Link>
-        <span className="sync" aria-live="polite">{store?.storageLabel}</span>
+        <Link href="/day" className="brand">Easy Tracking</Link>
+        <span className="sync" aria-live="polite">
+          {store?.storageLabel}
+          {usingSupabase && (
+            <>
+              {' · '}
+              <button type="button" className="linkish" onClick={() => supabase().auth.signOut()}>Sign out</button>
+            </>
+          )}
+        </span>
       </div>
       <nav aria-label="Sections">
         {LINKS.map(l => (
-          <Link key={l.href} href={l.href} aria-current={path.startsWith(l.href) ? 'page' : undefined}>
+          <Link key={l.href} href={l.href} aria-current={path.startsWith(l.href) || (!!l.also && path.startsWith(l.also)) ? 'page' : undefined}>
             {l.label}
           </Link>
         ))}

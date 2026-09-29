@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createRepository, type Repository } from './storage';
-import { emptyData, type AppData, type DayEntry, type Recipe, type Settings } from './types';
+import { emptyData, type AppData, type DayEntry, type Food, type Recipe, type Settings } from './types';
 
 type Store = {
   data: AppData;
@@ -11,6 +11,8 @@ type Store = {
   setTargets: (patch: Partial<Settings>) => void;
   saveRecipe: (recipe: Recipe) => void;
   deleteRecipe: (id: string) => void;
+  saveFood: (food: Food) => void;
+  deleteFood: (id: string) => void;
   setEntries: (date: string, entries: DayEntry[]) => void;
   setWeight: (date: string, field: 'am' | 'pm', value: number | null) => void;
 };
@@ -97,6 +99,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
             return { ...d, recipes };
           },
           repo => repo.deleteRecipe(id),
+        ),
+      saveFood: food =>
+        commit(
+          d => ({ ...d, foods: { ...d.foods, [food.id]: food } }),
+          repo => repo.upsertFood(food),
+        ),
+      deleteFood: id =>
+        commit(
+          d => {
+            const foods = { ...d.foods };
+            delete foods[id];
+            return { ...d, foods };
+          },
+          repo => repo.deleteFood(id),
         ),
       setEntries: (date, entries) =>
         commit(

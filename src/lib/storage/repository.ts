@@ -1,4 +1,4 @@
-import type { AppData, DayLog, Recipe, Settings, WeightEntry } from '../types';
+import type { AppData, DayLog, Food, Recipe, Settings, WeightEntry } from '../types';
 
 /**
  * Everything the app needs from persistence. The UI only talks to this interface,
@@ -12,6 +12,8 @@ export interface Repository {
   saveSettings(settings: Settings): Promise<void>;
   upsertRecipe(recipe: Recipe): Promise<void>;
   deleteRecipe(id: string): Promise<void>;
+  upsertFood(food: Food): Promise<void>;
+  deleteFood(id: string): Promise<void>;
   upsertDay(day: DayLog): Promise<void>;
   deleteDay(date: string): Promise<void>;
   upsertWeight(entry: WeightEntry): Promise<void>;

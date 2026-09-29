@@ -1,8 +1,26 @@
-/** Calories and grams of protein, carbs and fat. */
-export type Macros = { kcal: number; p: number; c: number; f: number };
+/**
+ * Calories, and grams of protein, carbs, fat, sugar, fibre and salt.
+ * Data saved before sugar/fibre/salt existed lacks them; calculations treat missing values as 0.
+ */
+export type Macros = { kcal: number; p: number; c: number; f: number; sugar: number; fibre: number; salt: number };
 
-/** One ingredient in a recipe. `grams` is the amount in the whole recipe; macros are per 100 g. */
-export type Ingredient = Macros & { name: string; grams: number };
+/** A food in the user's own list, with values per 100 g (or 100 ml). Picked by name, then only the amount is entered. */
+export type Food = Macros & {
+  id: string;
+  name: string;
+  brand?: string;
+  unit: 'g' | 'ml';
+  /** Barcode when the food came from Open Food Facts. */
+  code?: string;
+  source: 'off' | 'manual';
+  updatedAt: string;
+};
+
+/**
+ * One ingredient in a meal. `grams` is the amount in the whole meal; macros are per 100 g, copied from the food
+ * so a meal stays correct even if the food is deleted.
+ */
+export type Ingredient = Macros & { name: string; grams: number; foodId?: string; unit?: 'g' | 'ml' };
 
 export type Recipe = {
   id: string;
@@ -32,6 +50,7 @@ export type Settings = { kcal: number | null; p: number | null; c: number | null
 export type AppData = {
   settings: Settings;
   recipes: Record<string, Recipe>;
+  foods: Record<string, Food>;
   days: Record<string, DayLog>;
   weights: Record<string, WeightEntry>;
 };
@@ -41,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = { kcal: 2050, p: 150, c: null, f: null
 export const emptyData = (): AppData => ({
   settings: { ...DEFAULT_SETTINGS },
   recipes: {},
+  foods: {},
   days: {},
   weights: {},
 });

@@ -6,8 +6,10 @@ import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { addDays, fmtLong, todayKey } from '@/lib/dates';
 import { num, r0, r1, uid } from '@/lib/format';
-import { dayTotals, entryInfo, lastUsed, perServing } from '@/lib/macros';
-import type { DayEntry, Recipe, Settings } from '@/lib/types';
+import { ensureFood } from '@/lib/foods';
+import { dayTotals, entryInfo, forAmount, lastUsed, perServing, zeroMacros } from '@/lib/macros';
+import type { DayEntry, Food, Recipe, Settings } from '@/lib/types';
+import { FoodPicker, foodLabel } from './FoodPicker';
 import { NumberField } from './NumberField';
 
 function MacroRow({ label, color, value, target }: { label: string; color: string; value: number; target: number | null }) {
@@ -26,13 +28,10 @@ function MacroRow({ label, color, value, target }: { label: string; color: strin
   );
 }
 
-const snapOf = (r: Recipe) => {
-  const m = perServing(r);
-  return { name: r.name, g: m.g, kcal: m.kcal, p: m.p, c: m.c, f: m.f };
-};
+const snapOf = (r: Recipe) => ({ name: r.name, ...perServing(r) });
 
 export function DayView({ date }: { date: string }) {
-  const { data, setEntries, setTargets, toast } = useStore();
+  const { data, setEntries, setTargets, saveFood, toast } = useStore();
   const router = useRouter();
   const today = todayKey();
   const entries = data.days[date]?.entries ?? [];
@@ -45,6 +44,9 @@ export function DayView({ date }: { date: string }) {
 
   const [q, setQ] = useState('');
   const [quick, setQuick] = useState({ name: '', kcal: '', p: '', c: '', f: '' });
+  const [foodText, setFoodText] = useState('');
+  const [food, setFood] = useState<Food | null>(null);
+  const [amount, setAmount] = useState('');
 
   const picks = useMemo(() => {
     const lu = lastUsed(data.days);
@@ -61,8 +63,18 @@ export function DayView({ date }: { date: string }) {
   };
   const setServings = (id: string, s: number) =>
     update(entries.map(e => (e.id === id ? { ...e, servings: s } : e)));
+  const addFood = () => {
+    const g = num(amount);
+    if (!food) return toast('Search for a food and pick it from the list.');
+    if (!g || g <= 0) return toast(`Enter how many ${food.unit} you had.`);
+    update([...entries, { id: uid('e'), recipeId: null, servings: 1, snap: { name: foodLabel(food), ...forAmount(food, g) } }]);
+    setFood(null);
+    setFoodText('');
+    setAmount('');
+    toast(`Added ${r0(g)} ${food.unit} ${food.name}`);
+  };
   const addQuick = () => {
-    const snap = { name: quick.name.trim() || 'Quick add', kcal: num(quick.kcal) ?? 0, p: num(quick.p) ?? 0, c: num(quick.c) ?? 0, f: num(quick.f) ?? 0 };
+    const snap = { ...zeroMacros(), name: quick.name.trim() || 'Quick add', kcal: num(quick.kcal) ?? 0, p: num(quick.p) ?? 0, c: num(quick.c) ?? 0, f: num(quick.f) ?? 0 };
     if (!snap.kcal && !snap.p && !snap.c && !snap.f) return toast('Enter at least one value to add.');
     update([...entries, { id: uid('e'), recipeId: null, servings: 1, snap }]);
     setQuick({ name: '', kcal: '', p: '', c: '', f: '' });
@@ -104,6 +116,9 @@ export function DayView({ date }: { date: string }) {
         <MacroRow label="Protein" color="--p" value={t.p} target={st.p} />
         <MacroRow label="Carbs" color="--c" value={t.c} target={st.c} />
         <MacroRow label="Fat" color="--f" value={t.f} target={st.f} />
+        <p className="extra">
+          Sugar <b>{r1(t.sugar)} g</b> · Fibre <b>{r1(t.fibre)} g</b> · Salt <b>{t.salt.toFixed(2)} g</b>
+        </p>
         <details className="targets">
           <summary>Daily targets</summary>
           <div className="tgrid">
@@ -124,11 +139,11 @@ export function DayView({ date }: { date: string }) {
               <li className="entry" key={e.id}>
                 <span className="t">
                   {m.name}
-                  {m.gone && <small className="muted"> (recipe deleted)</small>}
+                  {m.gone && <small className="muted"> (meal deleted)</small>}
                 </span>
                 <span className="m">
                   {r0(m.kcal)} kcal, {r1(m.p)} g protein, {r1(m.c)} g carbs, {r1(m.f)} g fat
-                  {!m.quick && m.g ? `, about ${r0(m.g)} g` : ''}
+                  {m.g ? `, ${m.quick ? '' : 'about '}${r0(m.g)} g` : ''}
                 </span>
                 <span className="ctl">
                   {!m.quick && (
@@ -145,7 +160,7 @@ export function DayView({ date }: { date: string }) {
           })}
         </ul>
       ) : (
-        <p className="empty">Nothing logged for this day yet. Pick a recipe below.</p>
+        <p className="empty">Nothing logged for this day yet. Add a food or a meal below.</p>
       )}
       {!entries.length && prevEntries.length > 0 && (
         <button className="btn" onClick={() => { update(prevEntries.map(e => ({ ...e, id: uid('e') }))); toast('Copied the previous day'); }}>
@@ -154,10 +169,35 @@ export function DayView({ date }: { date: string }) {
       )}
 
       <div className="picker">
-        <h3>Add food</h3>
+        <h3>Add a food</h3>
+        <div className="addfood">
+          <FoodPicker
+            value={foodText}
+            onText={text => { setFoodText(text); setFood(null); }}
+            onPick={p => {
+              const f = ensureFood(p, data.foods, saveFood);
+              setFood(f);
+              setFoodText(foodLabel(f));
+              document.getElementById('day-amount')?.focus();
+            }}
+          />
+          <label className="amt">
+            <input id="day-amount" className="txt" inputMode="decimal" placeholder="0" aria-label="Amount" value={amount}
+              onChange={e => setAmount(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addFood(); }} />
+            <span>{food?.unit ?? 'g'}</span>
+          </label>
+          <button className="btn primary" onClick={addFood}>Add</button>
+        </div>
+        {food && num(amount) ? (
+          <p className="hint">
+            {(() => { const m = forAmount(food, num(amount)!); return `${r0(m.kcal)} kcal, ${r1(m.p)} g protein, ${r1(m.c)} g carbs, ${r1(m.f)} g fat`; })()}
+          </p>
+        ) : null}
+
+        <h3>Add a meal</h3>
         {Object.keys(data.recipes).length ? (
           <>
-            <input className="txt" type="search" placeholder="Search your recipes" aria-label="Search recipes" value={q} onChange={e => setQ(e.target.value)} />
+            <input className="txt" type="search" placeholder="Search your meals" aria-label="Search meals" value={q} onChange={e => setQ(e.target.value)} />
             <ul className="plist">
               {picks.length ? (
                 picks.map(r => {
@@ -172,17 +212,17 @@ export function DayView({ date }: { date: string }) {
                   );
                 })
               ) : (
-                <li className="empty" style={{ padding: '12px 14px' }}>No recipe matches “{q}”.</li>
+                <li className="empty" style={{ padding: '12px 14px' }}>No meal matches “{q}”.</li>
               )}
             </ul>
           </>
         ) : (
           <p className="muted">
-            You have no recipes yet. <Link className="btn" href="/recipes/new">Create your first recipe</Link>
+            You have no meals yet. <Link className="btn" href="/meals/new">Create your first meal</Link>
           </p>
         )}
         <details className="quick">
-          <summary>Quick add without a recipe</summary>
+          <summary>Quick add without a meal</summary>
           <div className="qgrid">
             <label className="fld qn">Name<input className="txt" placeholder="e.g. Lunch out" value={quick.name} onChange={e => setQuick({ ...quick, name: e.target.value })} /></label>
             {(['kcal', 'p', 'c', 'f'] as const).map(k => (

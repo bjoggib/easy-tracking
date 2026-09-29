@@ -1,15 +1,14 @@
 import { LocalRepository } from './local';
+import { SupabaseRepository } from './supabase';
 import type { Repository } from './repository';
 
 export type { Repository } from './repository';
 
-/**
- * Picks the storage backend. When Supabase is ready, add a SupabaseRepository
- * implementing `Repository` and return it here when NEXT_PUBLIC_STORAGE === 'supabase'.
- */
+/** Picks the storage backend from NEXT_PUBLIC_STORAGE. */
 export function createRepository(): Repository {
   switch (process.env.NEXT_PUBLIC_STORAGE) {
-    // case 'supabase': return new SupabaseRepository();
+    case 'supabase':
+      return new SupabaseRepository();
     default:
       return new LocalRepository();
   }

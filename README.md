@@ -1,7 +1,7 @@
-# Plate & Scale
+# Easy Tracking
 
-Recipes with macros, daily and weekly intake tracking, and morning/evening weight with a rolling 7-day average.
-Next.js (App Router) + TypeScript, no UI dependencies. Data is stored in `localStorage` for now.
+Meals built from foods (search Open Food Facts or enter your own, then type only the amount), macros incl. sugar, fibre and salt, daily and weekly intake tracking, and morning/evening weight with a rolling 7-day average.
+Next.js (App Router) + TypeScript, no UI dependencies. Data is stored in `localStorage` or Supabase.
 
 ## Run it
 
@@ -15,35 +15,38 @@ npm run build && npm start
 
 ```
 src/
-  app/                  routes: /day, /week, /recipes, /recipes/new, /recipes/[id], /weight
-  components/           DayView, WeekView, Recipes (list + editor), WeightView (+ chart), Header, NumberField
+  app/                  routes: /day, /week, /meals, /foods (+ /new, /[id]), /weight; api/off proxies Open Food Facts
+  components/           DayView, WeekView, Recipes (meals), Foods, FoodPicker (search), WeightView, Header, AuthGate, NumberField
   lib/
     types.ts            data model
-    macros.ts           all calculations (recipe totals, per serving, day totals, weight averages)
+    macros.ts           all calculations (meal totals, per serving, per amount, day totals, weight averages)
+    foods.ts, off.ts    food list helpers; Open Food Facts normalisation
     dates.ts, format.ts helpers
     store.tsx           React context: holds data, applies changes optimistically, persists via the repository
     storage/
       repository.ts     the interface every backend implements
-      local.ts          localStorage implementation (current)
+      local.ts          localStorage implementation
+      supabase.ts       Supabase implementation
       index.ts          picks the backend from NEXT_PUBLIC_STORAGE
-supabase/schema.sql     draft tables + row level security for the Supabase move
+supabase/schema.sql     tables + row level security
 ```
 
-## Moving to Supabase
+## Supabase
 
-1. Create the tables from `supabase/schema.sql`.
-2. `npm i @supabase/supabase-js` (and `@supabase/ssr` if you add server-side auth).
-3. Add `src/lib/storage/supabase.ts` with a class implementing `Repository`. Each method is one upsert or delete
-   on a single row, so it maps directly: `upsertRecipe` → `recipes.upsert`, `upsertDay` → `day_logs.upsert`, etc.
-   `load()` selects all four tables and assembles an `AppData` object.
-4. Return it from `createRepository()` when `NEXT_PUBLIC_STORAGE=supabase`, and add a sign-in page.
-5. To bring existing browser data along, read the `plate-and-scale-v1` key from localStorage once and upsert it.
+Set `NEXT_PUBLIC_STORAGE=supabase` plus `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`
+(see `.env.example`), and run `supabase/schema.sql` once in the SQL editor.
 
-The UI does not need to change: it only talks to `useStore()`.
+- Sign-in is with Google or an emailed magic link (`src/components/AuthGate.tsx`). Google must be enabled under
+  Authentication → Sign In / Providers, with the OAuth client's redirect URI set to `<SUPABASE_URL>/auth/v1/callback`. Add each deployed URL under
+  Authentication → URL Configuration → Redirect URLs.
+- `src/lib/storage/supabase.ts` implements `Repository`; row level security keeps each user to their own rows.
+- On the first sign-in in a browser that has local data and an empty account, that data is copied up once.
 
 ## Notes on behaviour
 
-- Nutrition is entered per 100 g; grams are the amount in the whole recipe.
-- Editing a recipe updates past days that use it. Deleting one leaves past days with the values captured when the entry was added.
+- Foods hold values per 100 g (or ml). A meal copies them into its ingredients, so it stays correct if a food is deleted;
+  editing a food updates the meals that use it. Picking an Open Food Facts result saves it to My foods.
+- Amounts in a meal are for the whole meal.
+- Editing a meal updates past days that use it. Deleting one leaves past days with the values captured when the entry was added.
 - Week averages count only days with food logged.
 - The 7-day weight average is the mean of daily averages over the last 7 calendar days, skipping days without readings.
