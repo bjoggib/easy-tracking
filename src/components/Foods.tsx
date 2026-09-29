@@ -78,6 +78,7 @@ export function FoodEditor({ id }: { id?: string }) {
   const router = useRouter();
   const existing = id ? data.foods[id] : undefined;
   const [d, setD] = useState<Draft>(() => draftOf(existing));
+  const [amount, setAmount] = useState('100');
   const [search, setSearch] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
   const usedIn = useMemo(
@@ -173,15 +174,42 @@ export function FoodEditor({ id }: { id?: string }) {
           </select>
         </label>
       </div>
-      <h3>Per 100 {d.unit}</h3>
-      <div className="fgrid">
-        {MACRO_KEYS.map(k => (
-          <label className="fld" key={k}>
-            {MACRO_LABELS[k]} <small>({k === 'kcal' ? 'kcal' : 'g'})</small>
-            <input className="txt" inputMode="decimal" value={d[k]} onChange={e => setD({ ...d, [k]: e.target.value })} />
-          </label>
-        ))}
-      </div>
+      <h3>Nutrition</h3>
+      <p className="hint">Enter values per 100 {d.unit} from the label. Change the amount on the right to see the values for that much.</p>
+      <table className="ftable">
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">Per 100 {d.unit}</th>
+            <th scope="col">
+              <label className="amt">
+                <input className="txt" inputMode="decimal" aria-label={`Amount in ${d.unit}`} value={amount} onChange={e => setAmount(e.target.value)} />
+                <span>{d.unit}</span>
+              </label>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {MACRO_KEYS.map(k => {
+            const unit = k === 'kcal' ? 'kcal' : 'g';
+            const v = ((num(d[k]) ?? 0) * (num(amount) ?? 0)) / 100;
+            return (
+              <tr key={k}>
+                <th scope="row">{MACRO_LABELS[k]}</th>
+                <td>
+                  <label className="amt">
+                    <input className="txt" inputMode="decimal" aria-label={`${MACRO_LABELS[k]} per 100 ${d.unit}`} value={d[k]} onChange={e => setD({ ...d, [k]: e.target.value })} />
+                    <span>{unit}</span>
+                  </label>
+                </td>
+                <td className="calc">
+                  {k === 'kcal' ? r0(v) : k === 'salt' ? v.toFixed(2) : r1(v)} <small>{unit}</small>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
       {usedIn.length > 0 && (
         <p className="hint">Used in {usedIn.map(r => r.name).join(', ')}. Saving updates those meals too.</p>
       )}

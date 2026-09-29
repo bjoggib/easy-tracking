@@ -143,6 +143,17 @@ details.quick summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .rlist.foods a{grid-template-columns:auto 1fr auto;align-items:center}
 .rlist.foods .thumb{grid-row:1/3}
 .rlist.foods .rk{grid-column:3}
+.ftable{width:100%;max-width:520px;border-collapse:collapse;margin-top:6px}
+.ftable th,.ftable td{padding:5px 0;text-align:left}
+.ftable th + th,.ftable td{padding-left:12px}
+.ftable thead th{font-size:.8rem;color:var(--muted);font-weight:500;vertical-align:bottom}
+.ftable tbody th{font-weight:500;white-space:nowrap}
+.ftable .amt input{min-height:40px;padding-left:10px}
+.ftable .amt span{font-size:.78rem}
+.ftable td.calc{text-align:right;font-weight:600;white-space:nowrap}
+.ftable td.calc small{font-weight:400;color:var(--muted)}
+.ftable thead .amt input{border-color:var(--ink);font-weight:600;color:var(--ink)}
+.ftable tbody tr + tr > *{border-top:1px solid var(--line)}
 .fdrop .pm{color:var(--muted);font-size:.8rem;white-space:nowrap}
 .fhead{padding:8px 14px 2px;font-size:.72rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .fnote{padding:6px 14px 8px;font-size:.85rem;color:var(--muted)}
