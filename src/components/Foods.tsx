@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { num, r0, r1, uid } from '@/lib/format';
-import { ensureFood, pickMacros, sameMacros } from '@/lib/foods';
+import { ensureFood, pickMacros } from '@/lib/foods';
 import { MACRO_KEYS, MACRO_LABELS, type MacroKey } from '@/lib/macros';
 import type { Food } from '@/lib/types';
 import { FoodPicker, foodLabel } from './FoodPicker';
@@ -65,28 +65,75 @@ export function FoodList() {
 
 type Draft = { name: string; brand: string; unit: 'g' | 'ml' } & Record<MacroKey, string>;
 
-const str = (v: number | undefined) => (v == null ? '' : String(v));
-const draftOf = (f?: Partial<Food>): Draft => ({
-  name: f?.name ?? '',
-  brand: f?.brand ?? '',
-  unit: f?.unit ?? 'g',
-  ...(Object.fromEntries(MACRO_KEYS.map(k => [k, str(f?.[k])])) as Record<MacroKey, string>),
+const blankDraft = (): Draft => ({
+  name: '',
+  brand: '',
+  unit: 'g',
+  ...(Object.fromEntries(MACRO_KEYS.map(k => [k, ''])) as Record<MacroKey, string>),
 });
 
-export function FoodEditor({ id }: { id?: string }) {
-  const { data, saveFood, deleteFood, saveRecipe, toast } = useStore();
-  const router = useRouter();
-  const existing = id ? data.foods[id] : undefined;
-  const [d, setD] = useState<Draft>(() => draftOf(existing));
-  const [amount, setAmount] = useState('100');
-  const [search, setSearch] = useState('');
-  const [confirmDel, setConfirmDel] = useState(false);
-  const usedIn = useMemo(
-    () => (existing ? Object.values(data.recipes).filter(r => r.ingredients.some(i => i.foodId === existing.id)) : []),
-    [data.recipes, existing],
-  );
+const fmt = (k: MacroKey, v: number) => (k === 'kcal' ? r0(v) : k === 'salt' ? v.toFixed(2) : r1(v));
+const unitOf = (k: MacroKey) => (k === 'kcal' ? 'kcal' : 'g');
 
-  if (id && !existing) {
+/**
+ * Nutrition per 100 g next to the values for a chosen amount. Per-100 values are
+ * text for a saved food, and inputs only while creating one (`onEdit`).
+ */
+function NutritionTable({ values, unit, onEdit }: { values: Record<MacroKey, number | string>; unit: 'g' | 'ml'; onEdit?: (k: MacroKey, v: string) => void }) {
+  const [amount, setAmount] = useState('100');
+  const factor = (num(amount) ?? 0) / 100;
+  return (
+    <table className="ftable">
+      <thead>
+        <tr>
+          <th scope="col"></th>
+          <th scope="col">Per 100 {unit}</th>
+          <th scope="col">
+            <label className="amt">
+              <input className="txt" inputMode="decimal" aria-label={`Amount in ${unit}`} value={amount} onChange={e => setAmount(e.target.value)} onFocus={e => e.target.select()} />
+              <span>{unit}</span>
+            </label>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {MACRO_KEYS.map(k => {
+          const per100 = num(values[k]) ?? 0;
+          return (
+            <tr key={k}>
+              <th scope="row">{MACRO_LABELS[k]}</th>
+              <td>
+                {onEdit ? (
+                  <label className="amt">
+                    <input className="txt" inputMode="decimal" aria-label={`${MACRO_LABELS[k]} per 100 ${unit}`} value={values[k]} onChange={e => onEdit(k, e.target.value)} />
+                    <span>{unitOf(k)}</span>
+                  </label>
+                ) : (
+                  <span className="per100">{fmt(k, per100)} <small>{unitOf(k)}</small></span>
+                )}
+              </td>
+              <td className="calc">{fmt(k, per100 * factor)} <small>{unitOf(k)}</small></td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+export function FoodEditor({ id }: { id?: string }) {
+  return id ? <FoodView id={id} /> : <NewFood />;
+}
+
+/** A saved food: values are fixed; pick an amount to see what it adds up to. */
+function FoodView({ id }: { id: string }) {
+  const { data, deleteFood, toast } = useStore();
+  const router = useRouter();
+  const food = data.foods[id];
+  const [confirmDel, setConfirmDel] = useState(false);
+  const usedIn = useMemo(() => Object.values(data.recipes).filter(r => r.ingredients.some(i => i.foodId === id)), [data.recipes, id]);
+
+  if (!food) {
     return (
       <>
         <h2>Food not found</h2>
@@ -95,39 +142,10 @@ export function FoodEditor({ id }: { id?: string }) {
     );
   }
 
-  const save = () => {
-    const name = d.name.trim();
-    if (!name) return toast('Give the food a name before saving.');
-    const m = pickMacros(Object.fromEntries(MACRO_KEYS.map(k => [k, num(d[k]) ?? 0])));
-    const brand = d.brand.trim();
-    const food: Food = {
-      ...(existing ?? { id: uid('fd'), source: 'manual' as const }),
-      name,
-      unit: d.unit,
-      ...m,
-      updatedAt: new Date().toISOString(),
-    };
-    if (brand) food.brand = brand;
-    else delete food.brand;
-    saveFood(food);
-    // Meals copy a food's values; bring the ones using this food up to date.
-    for (const r of usedIn) {
-      if (r.ingredients.every(i => i.foodId !== food.id || (sameMacros(i, m) && i.name === foodLabel(food) && i.unit === food.unit))) continue;
-      saveRecipe({
-        ...r,
-        ingredients: r.ingredients.map(i => (i.foodId === food.id ? { ...i, ...m, name: foodLabel(food), unit: food.unit } : i)),
-        updatedAt: food.updatedAt,
-      });
-    }
-    toast(usedIn.length ? `Saved ${name} and updated ${usedIn.length} meal${usedIn.length > 1 ? 's' : ''}` : `Saved ${name}`);
-    router.push('/foods');
-  };
-
   const remove = () => {
-    if (!existing) return;
     if (!confirmDel) return setConfirmDel(true);
-    deleteFood(existing.id);
-    toast(`Deleted ${existing.name}. Meals that use it keep their values.`);
+    deleteFood(food.id);
+    toast(`Deleted ${food.name}. Meals that use it keep their values.`);
     router.push('/foods');
   };
 
@@ -136,27 +154,73 @@ export function FoodEditor({ id }: { id?: string }) {
       <div className="row" style={{ marginTop: 20 }}>
         <Link className="btn quiet" href="/foods">‹ My foods</Link>
       </div>
-      <div className="row">
-        {existing?.image && <FoodThumb src={existing.image} size={72} zoomable alt={foodLabel(existing)} />}
-        <h2>{existing ? 'Edit food' : 'New food'}</h2>
+      <div className="fhero">
+        {food.image && <FoodThumb src={food.image} size={88} zoomable alt={foodLabel(food)} />}
+        <div>
+          <h2>{food.name}</h2>
+          <p className="muted">
+            {food.brand ? `${food.brand} · ` : ''}
+            {food.source === 'off' ? 'From Open Food Facts' : 'Entered by hand'}
+          </p>
+        </div>
       </div>
-      {!existing && (
-        <>
-          <p className="hint">Search Open Food Facts or type a barcode number to fill this in, or enter the values from the label.</p>
-          <FoodPicker
-            label="Search Open Food Facts"
-            value={search}
-            onText={setSearch}
-            onPick={p => {
-              if ('id' in p) return router.push(`/foods/${p.id}`);
-              const f = ensureFood(p, data.foods, saveFood);
-              toast(`Added ${f.name}`);
-              router.push(`/foods/${f.id}`);
-            }}
-            autoFocus
-          />
-        </>
-      )}
+      <h3>Nutrition</h3>
+      <p className="hint">Change the amount at the top right to see the values for that much.</p>
+      <NutritionTable values={food} unit={food.unit} />
+      {usedIn.length > 0 && <p className="hint" style={{ marginTop: 16 }}>Used in {usedIn.map(r => r.name).join(', ')}.</p>}
+      <div className="actions">
+        <span className="spacer" />
+        <button className="btn danger" onClick={remove}>{confirmDel ? 'Tap again to delete' : 'Delete food'}</button>
+      </div>
+    </>
+  );
+}
+
+/** Add a food: from Open Food Facts, or by entering the label's values once. */
+function NewFood() {
+  const { data, saveFood, toast } = useStore();
+  const router = useRouter();
+  const [d, setD] = useState<Draft>(blankDraft);
+  const [search, setSearch] = useState('');
+
+  const save = () => {
+    const name = d.name.trim();
+    if (!name) return toast('Give the food a name before saving.');
+    if (MACRO_KEYS.every(k => d[k].trim() === '')) return toast('Enter the values from the label before saving.');
+    const brand = d.brand.trim();
+    const food: Food = {
+      id: uid('fd'),
+      source: 'manual',
+      name,
+      ...(brand ? { brand } : {}),
+      unit: d.unit,
+      ...pickMacros(Object.fromEntries(MACRO_KEYS.map(k => [k, num(d[k]) ?? 0]))),
+      updatedAt: new Date().toISOString(),
+    };
+    saveFood(food);
+    toast(`Saved ${name}`);
+    router.push(`/foods/${food.id}`);
+  };
+
+  return (
+    <>
+      <div className="row" style={{ marginTop: 20 }}>
+        <Link className="btn quiet" href="/foods">‹ My foods</Link>
+      </div>
+      <h2>New food</h2>
+      <p className="hint">Search Open Food Facts or type a barcode number, or enter the values from the label below.</p>
+      <FoodPicker
+        label="Search Open Food Facts"
+        value={search}
+        onText={setSearch}
+        onPick={p => {
+          if ('id' in p) return router.push(`/foods/${p.id}`);
+          const f = ensureFood(p, data.foods, saveFood);
+          toast(`Added ${f.name}`);
+          router.push(`/foods/${f.id}`);
+        }}
+        autoFocus
+      />
       <div className="fgrid">
         <label className="fld wide">
           Name
@@ -175,49 +239,11 @@ export function FoodEditor({ id }: { id?: string }) {
         </label>
       </div>
       <h3>Nutrition</h3>
-      <p className="hint">Enter values per 100 {d.unit} from the label. Change the amount on the right to see the values for that much.</p>
-      <table className="ftable">
-        <thead>
-          <tr>
-            <th scope="col"></th>
-            <th scope="col">Per 100 {d.unit}</th>
-            <th scope="col">
-              <label className="amt">
-                <input className="txt" inputMode="decimal" aria-label={`Amount in ${d.unit}`} value={amount} onChange={e => setAmount(e.target.value)} />
-                <span>{d.unit}</span>
-              </label>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {MACRO_KEYS.map(k => {
-            const unit = k === 'kcal' ? 'kcal' : 'g';
-            const v = ((num(d[k]) ?? 0) * (num(amount) ?? 0)) / 100;
-            return (
-              <tr key={k}>
-                <th scope="row">{MACRO_LABELS[k]}</th>
-                <td>
-                  <label className="amt">
-                    <input className="txt" inputMode="decimal" aria-label={`${MACRO_LABELS[k]} per 100 ${d.unit}`} value={d[k]} onChange={e => setD({ ...d, [k]: e.target.value })} />
-                    <span>{unit}</span>
-                  </label>
-                </td>
-                <td className="calc">
-                  {k === 'kcal' ? r0(v) : k === 'salt' ? v.toFixed(2) : r1(v)} <small>{unit}</small>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {usedIn.length > 0 && (
-        <p className="hint">Used in {usedIn.map(r => r.name).join(', ')}. Saving updates those meals too.</p>
-      )}
+      <p className="hint">Enter the values per 100 {d.unit} from the label. They can&apos;t be changed after saving.</p>
+      <NutritionTable values={d} unit={d.unit} onEdit={(k, v) => setD(cur => ({ ...cur, [k]: v }))} />
       <div className="actions">
         <button className="btn primary" onClick={save}>Save food</button>
         <Link className="btn quiet" href="/foods">Cancel</Link>
-        <span className="spacer" />
-        {existing && <button className="btn danger" onClick={remove}>{confirmDel ? 'Tap again to delete' : 'Delete food'}</button>}
       </div>
     </>
   );

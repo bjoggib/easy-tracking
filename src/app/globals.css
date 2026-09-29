@@ -156,6 +156,12 @@ details.quick summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .ftable tbody th{font-weight:500;white-space:nowrap}
 .ftable .amt input{min-height:40px;padding-left:10px}
 .ftable .amt span{font-size:.78rem}
+.ftable thead th:nth-child(2){text-align:right;padding-right:10px}
+.ftable .per100{display:block;text-align:right;padding-right:10px}
+.ftable .per100 small,.ftable td.calc small{font-weight:400;color:var(--muted)}
+.fhero{display:flex;gap:16px;align-items:center;margin-top:8px}
+.fhero h2{margin:0}
+.fhero p{margin:2px 0 0}
 .ftable td.calc{text-align:right;font-weight:600;white-space:nowrap}
 .ftable td.calc small{font-weight:400;color:var(--muted)}
 .ftable thead .amt input{border-color:var(--ink);font-weight:600;color:var(--ink)}

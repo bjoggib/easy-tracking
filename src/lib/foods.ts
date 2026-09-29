@@ -16,7 +16,6 @@ export function ensureFood(picked: Food | OffFood, foods: Record<string, Food>, 
   return food;
 }
 
-export const sameMacros = (a: Partial<Macros>, b: Partial<Macros>) => MACRO_KEYS.every(k => (a[k] ?? 0) === (b[k] ?? 0));
 
 export const pickMacros = (m: Partial<Macros>): Macros => {
   const out = {} as Macros;

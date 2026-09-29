@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { num, r0, r1, uid } from '@/lib/format';
-import { ensureFood, pickMacros, sameMacros } from '@/lib/foods';
+import { ensureFood, pickMacros } from '@/lib/foods';
 import { forAmount, MACRO_KEYS, MACRO_LABELS, perServing, recipeTotals, scale, type MacroKey } from '@/lib/macros';
 import type { Food, Ingredient, Macros, Recipe } from '@/lib/types';
 import { FoodPicker, foodLabel, type Picked } from './FoodPicker';
@@ -129,15 +129,12 @@ export function RecipeEditor({ id }: { id?: string }) {
     const ingredients = rows.map((i): Ingredient => {
       const m = macrosOf(i);
       const label = i.name.trim();
-      // Keep the food list in step: corrected values update the food, new ones become foods.
+      // Values entered by hand become a new food, so next time only the amount is needed.
       let food: Food | undefined = (i.foodId && data.foods[i.foodId]) || byName.get(label.toLowerCase());
       if (!food) {
         food = { id: uid('fd'), name: label, unit: i.unit, source: 'manual', updatedAt: now, ...m };
         saveFood(food);
         byName.set(label.toLowerCase(), food);
-      } else if (!sameMacros(food, m)) {
-        food = { ...food, ...m, updatedAt: now };
-        saveFood(food);
       }
       return { name: label, grams: num(i.grams) ?? 0, foodId: food.id, unit: i.unit, ...m };
     });
@@ -206,7 +203,7 @@ export function RecipeEditor({ id }: { id?: string }) {
                 <span>
                   Per 100 {row.unit}: {r0(num(row.kcal))} kcal, {r1(num(row.p))} g protein, {r1(num(row.c))} g carbs, {r1(num(row.f))} g fat
                 </span>
-                <button type="button" className="linkish" onClick={() => setIng(row.key, { edit: true })}>Edit values</button>
+                {!row.foodId && <button type="button" className="linkish" onClick={() => setIng(row.key, { edit: true })}>Edit values</button>}
               </div>
             )}
             {row.edit && (
