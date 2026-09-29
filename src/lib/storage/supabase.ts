@@ -93,13 +93,25 @@ type RecipeRow = Omit<Recipe, 'updatedAt'> & { updated_at: string };
 const toRow = ({ updatedAt, ...r }: Recipe): RecipeRow => ({ ...r, updated_at: updatedAt });
 const fromRow = ({ updated_at, ...r }: RecipeRow): Recipe => ({ ...r, updatedAt: updated_at });
 
-const FOOD_COLUMNS = 'id, name, brand, unit, code, source, kcal, p, c, f, sugar, fibre, salt, updated_at';
-type FoodRow = Omit<Food, 'updatedAt' | 'brand' | 'code'> & { brand: string | null; code: string | null; updated_at: string };
+const FOOD_COLUMNS = 'id, name, brand, unit, code, source, image, kcal, p, c, f, sugar, fibre, salt, updated_at';
+type FoodRow = Omit<Food, 'updatedAt' | 'brand' | 'code' | 'image'> & {
+  brand: string | null;
+  code: string | null;
+  image: string | null;
+  updated_at: string;
+};
 
-const foodToRow = ({ updatedAt, brand, code, ...f }: Food): FoodRow => ({ ...f, brand: brand ?? null, code: code ?? null, updated_at: updatedAt });
-const foodFromRow = ({ updated_at, brand, code, ...f }: FoodRow): Food => ({
+const foodToRow = ({ updatedAt, brand, code, image, ...f }: Food): FoodRow => ({
+  ...f,
+  brand: brand ?? null,
+  code: code ?? null,
+  image: image ?? null,
+  updated_at: updatedAt,
+});
+const foodFromRow = ({ updated_at, brand, code, image, ...f }: FoodRow): Food => ({
   ...f,
   ...(brand ? { brand } : {}),
   ...(code ? { code } : {}),
+  ...(image ? { image } : {}),
   updatedAt: updated_at,
 });

@@ -9,6 +9,7 @@ import { ensureFood, pickMacros, sameMacros } from '@/lib/foods';
 import { MACRO_KEYS, MACRO_LABELS, type MacroKey } from '@/lib/macros';
 import type { Food } from '@/lib/types';
 import { FoodPicker, foodLabel } from './FoodPicker';
+import { FoodThumb } from './FoodThumb';
 
 export function FoodList() {
   const { data } = useStore();
@@ -33,11 +34,12 @@ export function FoodList() {
       {hasAny ? (
         <>
           <input className="txt" type="search" style={{ marginTop: 16 }} placeholder="Search my foods" aria-label="Search my foods" value={q} onChange={e => setQ(e.target.value)} />
-          <ul className="rlist">
+          <ul className="rlist foods">
             {list.length ? (
               list.map(f => (
                 <li key={f.id}>
                   <Link href={`/foods/${f.id}`}>
+                    <FoodThumb src={f.image} size={48} />
                     <span className="rn">{f.name}</span>
                     <span className="rs">
                       {f.brand ? `${f.brand}. ` : ''}Per 100 {f.unit}: {r1(f.p)} g protein, {r1(f.c)} g carbs, {r1(f.f)} g fat
@@ -133,7 +135,10 @@ export function FoodEditor({ id }: { id?: string }) {
       <div className="row" style={{ marginTop: 20 }}>
         <Link className="btn quiet" href="/foods">‹ My foods</Link>
       </div>
-      <h2>{existing ? 'Edit food' : 'New food'}</h2>
+      <div className="row">
+        {existing?.image && <FoodThumb src={existing.image} size={72} />}
+        <h2>{existing ? 'Edit food' : 'New food'}</h2>
+      </div>
       {!existing && (
         <>
           <p className="hint">Search Open Food Facts or type a barcode number to fill this in, or enter the values from the label.</p>

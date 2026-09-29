@@ -10,9 +10,11 @@ type OffProduct = {
   brands?: string | string[];
   quantity?: string;
   nutriments?: Record<string, number | string | undefined>;
+  image_front_small_url?: string;
+  image_front_thumb_url?: string;
 };
 
-export const OFF_FIELDS = 'code,product_name,product_name_en,brands,quantity,nutriments';
+export const OFF_FIELDS = 'code,product_name,product_name_en,brands,quantity,nutriments,image_front_small_url,image_front_thumb_url';
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -28,12 +30,14 @@ export function fromOff(p: OffProduct): OffFood | null {
   if (!name || kcal == null) return null;
   const brand = (Array.isArray(p.brands) ? p.brands[0] : p.brands?.split(',')[0])?.trim();
   const sodium = get('sodium');
+  const image = p.image_front_small_url || p.image_front_thumb_url;
   return {
     name,
     ...(brand ? { brand } : {}),
     unit: /\d\s*(ml|cl|l)\b/i.test(p.quantity ?? '') ? 'ml' : 'g',
     ...(p.code ? { code: p.code } : {}),
     source: 'off',
+    ...(image ? { image } : {}),
     kcal,
     p: get('proteins') ?? 0,
     c: get('carbohydrates') ?? 0,

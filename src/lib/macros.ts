@@ -4,7 +4,7 @@ import { addDays } from './dates';
 export const MACRO_KEYS = ['kcal', 'p', 'c', 'f', 'sugar', 'fibre', 'salt'] as const;
 export type MacroKey = (typeof MACRO_KEYS)[number];
 export const MACRO_LABELS: Record<MacroKey, string> = {
-  kcal: 'kcal', p: 'Protein', c: 'Carbs', f: 'Fat', sugar: 'Sugar', fibre: 'Fibre', salt: 'Salt',
+  kcal: 'Calories', p: 'Protein', c: 'Carbs', f: 'Fat', sugar: 'Sugar', fibre: 'Fibre', salt: 'Salt',
 };
 export const zeroMacros = (): Macros => ({ kcal: 0, p: 0, c: 0, f: 0, sugar: 0, fibre: 0, salt: 0 });
 const zero = (): Macros & { g: number } => ({ g: 0, ...zeroMacros() });

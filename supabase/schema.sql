@@ -23,6 +23,7 @@ create table foods (
   brand text,
   unit text not null default 'g' check (unit in ('g', 'ml')),
   code text,                                -- barcode, when imported from Open Food Facts
+  image text,                               -- product photo URL from Open Food Facts
   source text not null default 'manual' check (source in ('off', 'manual')),
   kcal numeric not null default 0,
   p numeric not null default 0,

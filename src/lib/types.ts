@@ -13,6 +13,8 @@ export type Food = Macros & {
   /** Barcode when the food came from Open Food Facts. */
   code?: string;
   source: 'off' | 'manual';
+  /** Product photo URL from Open Food Facts (about 200 px). */
+  image?: string;
   updatedAt: string;
 };
 

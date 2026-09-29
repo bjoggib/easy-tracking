@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { r0, r1 } from '@/lib/format';
 import type { OffFood } from '@/lib/off';
 import type { Food } from '@/lib/types';
+import { FoodThumb } from './FoodThumb';
 
 export type Picked = Food | OffFood;
 
@@ -92,7 +93,8 @@ export function FoodPicker({ value, onText, onPick, onManual, placeholder = 'Sea
         <button type="button" tabIndex={-1} className={i === active ? 'on' : undefined} onMouseEnter={() => setActive(i)} onClick={() => choose(o)}>
           {f ? (
             <>
-              <span>{foodLabel(f)}</span>
+              <FoodThumb src={f.image} size={36} />
+              <span className="fn">{foodLabel(f)}</span>
               <span className="pm">{r0(f.kcal)} kcal, {r1(f.p)} g protein /100 {f.unit}</span>
             </>
           ) : (
