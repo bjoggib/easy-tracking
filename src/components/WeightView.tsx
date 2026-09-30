@@ -50,7 +50,6 @@ export function WeightView() {
           <NumberField key={`pm-${date}-${u.system}`} value={shown(w?.pm)} placeholder="—" onCommit={commit('pm')} />
         </label>
       </div>
-      <p className="hint">Saves as you leave each field. Daily average uses whichever readings exist for that day.</p>
 
       <div className="stats">
         <div className="stat">
@@ -104,7 +103,6 @@ export function WeightView() {
               </tbody>
             </table>
           </div>
-          <p className="hint">Select a row to edit that day.</p>
         </>
       )}
     </>
@@ -127,7 +125,7 @@ function WeightChart({ weights, range, u }: { weights: Record<string, WeightEntr
 
   const days = Object.keys(weights).filter(k => dailyAvg(weights, k) != null).sort();
   if (days.length < 2) {
-    return <div id="chartBox" ref={box}><p className="empty" style={{ padding: '28px 16px' }}>Log at least two days to see a trend.</p></div>;
+    return <div id="chartBox" ref={box}><p className="empty" style={{ padding: '28px 0' }}>A trend appears after two days.</p></div>;
   }
 
   const end = days[days.length - 1];
@@ -180,7 +178,7 @@ function WeightChart({ weights, range, u }: { weights: Record<string, WeightEntr
             <title>{`${fmtShort(k)}: ${v.toFixed(u.bodyDigits)} ${u.body}`}</title>
           </circle>
         ))}
-        <path d={path} fill="none" stroke="var(--p)" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+        <path d={path} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
       </svg>
     </div>
   );

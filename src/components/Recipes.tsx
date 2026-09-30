@@ -24,12 +24,9 @@ export function RecipeList() {
 
   return (
     <>
-      <div className="row" style={{ justifyContent: 'space-between', marginTop: 24 }}>
-        <h2 style={{ margin: 0 }}>My meals</h2>
-        <span className="row">
-          <Link className="btn quiet" href="/foods">My foods</Link>
-          <Link className="btn primary" href="/meals/new">New meal</Link>
-        </span>
+      <div className="listhead">
+        <LibraryTabs current="meals" />
+        <Link className="btn primary" href="/meals/new">New meal</Link>
       </div>
       {hasAny ? (
         <>
@@ -43,23 +40,20 @@ export function RecipeList() {
                     <Link href={`/meals/${r.id}`}>
                       <span className="rn">{r.name}</span>
                       <span className="rs">
-                        {r.ingredients.length} ingredients, makes {r1(r.servings)} serving{r.servings === 1 ? '' : 's'}. Per serving: {r1(m.p)} g protein, {r1(m.c)} g carbs, {r1(m.f)} g fat
+                        {r0(m.p)} g protein{r.servings !== 1 ? ` · ${r1(r.servings)} servings` : ''}
                       </span>
-                      <span className="rk">{r0(m.kcal)}<small>kcal per serving</small></span>
+                      <span className="rk">{r0(m.kcal)}<small>kcal</small></span>
                     </Link>
                   </li>
                 );
               })
             ) : (
-              <li className="empty">No meal matches “{q}”.</li>
+              <li className="empty">No match.</li>
             )}
           </ul>
         </>
       ) : (
-        <p className="empty">
-          Save a meal once with its ingredients, and it will be ready to add to any day. Search for each food and enter how much
-          goes in; the nutrition fills in for you.
-        </p>
+        <p className="empty">No meals yet.</p>
       )}
     </>
   );
@@ -182,9 +176,7 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
 
   return (
     <>
-      <div className="row" style={{ marginTop: 20 }}>
-        <Link className="btn quiet" href="/meals">‹ All meals</Link>
-      </div>
+      <Link className="back" href="/meals">← Meals</Link>
       <h2>{existing ? 'Edit meal' : 'New meal'}</h2>
       <div className="row" style={{ alignItems: 'end' }}>
         <label className="fld" style={{ flex: 3, minWidth: 200 }}>
@@ -198,10 +190,6 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
       </div>
 
       <h3>Ingredients</h3>
-      <p className="hint">
-        Search for each food and enter how much goes into the whole meal. Nutrition comes from your foods or Open Food Facts; you can
-        type a barcode number too.
-      </p>
       {ings.map(row => {
         const amount = forAmount(macrosOf(row), gramsOf(row, u));
         return (
@@ -224,14 +212,14 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
             {hasValues(row) && !row.edit && (
               <div className="ing-sub">
                 <span>
-                  Per 100 {row.unit}: {r0(num(row.kcal))} kcal, {r1(num(row.p))} g protein, {r1(num(row.c))} g carbs, {r1(num(row.f))} g fat
+                  {r0(num(row.kcal))} kcal · {r1(num(row.p))} g protein per 100 {row.unit}
                 </span>
                 {!row.foodId && <button type="button" className="linkish" onClick={() => setIng(row.key, { edit: true })}>Edit values</button>}
               </div>
             )}
             {row.edit && (
               <div className="ing-vals">
-                <p className="hint" style={{ gridColumn: '1/-1', margin: 0 }}>Per 100 {row.unit}, as printed on the label.</p>
+                <p className="hint" style={{ gridColumn: '1/-1', margin: 0 }}>Per 100 {row.unit}</p>
                 {MACRO_KEYS.map(k => (
                   <label className="fld" key={k}>
                     {MACRO_LABELS[k]} <small>({UNIT[k]})</small>
@@ -269,6 +257,16 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
         {existing && <button className="btn danger" onClick={remove}>{confirmDel ? 'Tap again to delete' : 'Delete meal'}</button>}
       </div>
     </>
+  );
+}
+
+/** Meals | Foods switch at the top of both lists. */
+export function LibraryTabs({ current }: { current: 'meals' | 'foods' }) {
+  return (
+    <nav className="seg" aria-label="Library">
+      <Link href="/meals" aria-current={current === 'meals' ? 'page' : undefined}>Meals</Link>
+      <Link href="/foods" aria-current={current === 'foods' ? 'page' : undefined}>Foods</Link>
+    </nav>
   );
 }
 

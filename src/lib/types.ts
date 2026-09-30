@@ -54,7 +54,12 @@ export type Settings = {
   f: number | null;
   /** Display units; missing in data saved before the option existed (means metric). */
   units?: 'metric' | 'us';
+  /** Nutrients shown on the day page besides calories; missing means DEFAULT_SHOWN. */
+  show?: ShownNutrient[];
 };
+
+export type ShownNutrient = 'p' | 'c' | 'f' | 'sugar' | 'fibre' | 'salt';
+export const DEFAULT_SHOWN: ShownNutrient[] = ['p', 'c', 'f'];
 
 export type AppData = {
   settings: Settings;
@@ -64,7 +69,7 @@ export type AppData = {
   weights: Record<string, WeightEntry>;
 };
 
-export const DEFAULT_SETTINGS: Settings = { kcal: 2050, p: 150, c: null, f: null, units: 'metric' };
+export const DEFAULT_SETTINGS: Settings = { kcal: 2050, p: 150, c: null, f: null, units: 'metric', show: DEFAULT_SHOWN };
 
 export const emptyData = (): AppData => ({
   settings: { ...DEFAULT_SETTINGS },

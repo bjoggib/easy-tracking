@@ -4,7 +4,8 @@
 create table settings (
   user_id uuid primary key references auth.users on delete cascade default auth.uid(),
   kcal numeric, p numeric, c numeric, f numeric,
-  units text not null default 'metric' check (units in ('metric', 'us'))
+  units text not null default 'metric' check (units in ('metric', 'us')),
+  show jsonb not null default '["p", "c", "f"]'::jsonb  -- nutrients shown on the day page besides calories
 );
 
 create table recipes (

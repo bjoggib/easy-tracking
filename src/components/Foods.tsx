@@ -14,6 +14,7 @@ import type { Food } from '@/lib/types';
 import { FoodPicker, foodLabel } from './FoodPicker';
 import { unitsFor, useUnits } from '@/lib/units';
 import { FoodThumb } from './FoodThumb';
+import { LibraryTabs } from './Recipes';
 
 export function FoodList() {
   const { data } = useStore();
@@ -28,16 +29,13 @@ export function FoodList() {
 
   return (
     <>
-      <div className="row" style={{ marginTop: 20 }}>
-        <Link className="btn quiet" href="/meals">‹ My meals</Link>
-      </div>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0 }}>My foods</h2>
+      <div className="listhead">
+        <LibraryTabs current="foods" />
         <Link className="btn primary" href="/foods/new">New food</Link>
       </div>
       {hasAny ? (
         <>
-          <input className="txt" type="search" style={{ marginTop: 16 }} placeholder="Search my foods" aria-label="Search my foods" value={q} onChange={e => setQ(e.target.value)} />
+          <input className="txt" type="search" style={{ marginTop: 16 }} placeholder="Search foods" aria-label="Search foods" value={q} onChange={e => setQ(e.target.value)} />
           <ul className="rlist foods">
             {list.length ? (
               list.map(f => (
@@ -46,22 +44,19 @@ export function FoodList() {
                     <FoodThumb src={f.image} size={48} />
                     <span className="rn">{f.name}</span>
                     <span className="rs">
-                      {f.brand ? `${f.brand}. ` : ''}Per 100 {f.unit}: {r1(f.p)} g protein, {r1(f.c)} g carbs, {r1(f.f)} g fat
-                      {f.source === 'off' ? '. From Open Food Facts' : ''}
+                      {f.brand ? `${f.brand} · ` : ''}{r1(f.p)} g protein
                     </span>
-                    <span className="rk">{r0(f.kcal)}<small>kcal /100 {f.unit}</small></span>
+                    <span className="rk">{r0(f.kcal)}<small>kcal/100 {f.unit}</small></span>
                   </Link>
                 </li>
               ))
             ) : (
-              <li className="empty">No food matches “{q}”.</li>
+              <li className="empty">No match.</li>
             )}
           </ul>
         </>
       ) : (
-        <p className="empty">
-          Foods you pick or enter while building a meal are saved here, so next time you only type the amount.
-        </p>
+        <p className="empty">No foods yet.</p>
       )}
     </>
   );
@@ -163,9 +158,7 @@ function FoodView({ id }: { id: string }) {
 
   return (
     <>
-      <div className="row" style={{ marginTop: 20 }}>
-        <Link className="btn quiet" href="/foods">‹ My foods</Link>
-      </div>
+      <Link className="back" href="/foods">← Foods</Link>
       <div className="fhero">
         <FoodThumb key={food.image} src={food.image} size={88} zoomable alt={foodLabel(food)} />
         <div>
@@ -178,7 +171,6 @@ function FoodView({ id }: { id: string }) {
         </div>
       </div>
       <h3>Nutrition</h3>
-      <p className="hint">Change the amount at the top right to see the values for that much.</p>
       <NutritionTable values={food} unit={food.unit} />
       {usedIn.length > 0 && <p className="hint" style={{ marginTop: 16 }}>Used in {usedIn.map(r => r.name).join(', ')}.</p>}
       <div className="actions">
@@ -263,7 +255,6 @@ function ScanLabel({ onResult }: { onResult: (r: ScannedFood) => void }) {
       <button type="button" className="btn primary" disabled={busy} onClick={() => input.current?.click()}>
         {busy ? 'Reading the label…' : 'Scan nutrition label'}
       </button>
-      <span className="hint">Take a photo of the nutrition table; the values fill in below.</span>
     </div>
   );
 }
@@ -297,9 +288,7 @@ function NewFood() {
 
   return (
     <>
-      <div className="row" style={{ marginTop: 20 }}>
-        <Link className="btn quiet" href="/foods">‹ My foods</Link>
-      </div>
+      <Link className="back" href="/foods">← Foods</Link>
       <h2>New food</h2>
       <ScanLabel
         onResult={r => {
@@ -318,7 +307,7 @@ function NewFood() {
           Filled in from the label. Check the values below before saving{scanNote ? `. Note: ${scanNote}` : '.'}
         </p>
       )}
-      <p className="hint">Or search Open Food Facts, type a barcode number, or enter the values from the label below.</p>
+      <p className="hint">or search Open Food Facts</p>
       <FoodPicker
         label="Search Open Food Facts"
         value={search}
@@ -349,7 +338,7 @@ function NewFood() {
         </label>
       </div>
       <h3>Nutrition</h3>
-      <p className="hint">Enter the values per 100 {d.unit} from the label. They can&apos;t be changed after saving.</p>
+      <p className="hint">Can&apos;t be changed after saving.</p>
       <NutritionTable values={d} unit={d.unit} onEdit={(k, v) => setD(cur => ({ ...cur, [k]: v }))} />
       <div className="actions">
         <button className="btn primary" onClick={save}>Save food</button>

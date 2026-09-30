@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import { emptyData, type AppData, type DayLog, type Food, type Recipe, type Settings, type WeightEntry } from '../types';
+import { DEFAULT_SHOWN, emptyData, type AppData, type DayLog, type Food, type Recipe, type Settings, type WeightEntry } from '../types';
 import { LOCAL_KEY, LocalRepository } from './local';
 import type { Repository } from './repository';
 
@@ -25,7 +25,7 @@ export class SupabaseRepository implements Repository {
 
   async load(): Promise<AppData> {
     const [settings, recipes, foods, days, weights] = await Promise.all([
-      this.db.from('settings').select('kcal, p, c, f, units').maybeSingle().then(ok<Settings | null>),
+      this.db.from('settings').select('kcal, p, c, f, units, show').maybeSingle().then(ok<Settings | null>),
       this.db.from('recipes').select('id, name, servings, ingredients, updated_at').then(ok<RecipeRow[]>),
       this.db.from('foods').select(FOOD_COLUMNS).then(ok<FoodRow[]>),
       this.db.from('day_logs').select('date, entries').then(ok<DayLog[]>),
@@ -63,7 +63,7 @@ export class SupabaseRepository implements Repository {
   }
 
   async saveSettings(s: Settings) {
-    ok(await this.db.from('settings').upsert({ kcal: s.kcal, p: s.p, c: s.c, f: s.f, units: s.units ?? 'metric' }));
+    ok(await this.db.from('settings').upsert({ kcal: s.kcal, p: s.p, c: s.c, f: s.f, units: s.units ?? 'metric', show: s.show ?? DEFAULT_SHOWN }));
   }
   async upsertRecipe(r: Recipe) {
     ok(await this.db.from('recipes').upsert(toRow(r)));

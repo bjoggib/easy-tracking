@@ -2,23 +2,32 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { addDays, fmtLong, todayKey } from '@/lib/dates';
 import { num, r0, r1, uid } from '@/lib/format';
 import { ensureFood } from '@/lib/foods';
 import { dayTotals, entryInfo, forAmount, lastUsed, perServing, zeroMacros } from '@/lib/macros';
-import type { DayEntry, Food, Recipe } from '@/lib/types';
+import { DEFAULT_SHOWN, type DayEntry, type Food, type Recipe, type ShownNutrient } from '@/lib/types';
 import { useUnits } from '@/lib/units';
 import { FoodPicker, foodLabel } from './FoodPicker';
 import { NumberField } from './NumberField';
 
-function MacroRow({ label, color, value, target }: { label: string; color: string; value: number; target: number | null }) {
+const NUTRIENT_INFO: Record<ShownNutrient, { label: string; color: string }> = {
+  p: { label: 'Protein', color: '--p' },
+  c: { label: 'Carbs', color: '--c' },
+  f: { label: 'Fat', color: '--f' },
+  sugar: { label: 'Sugar', color: '--sugar' },
+  fibre: { label: 'Fibre', color: '--fibre' },
+  salt: { label: 'Salt', color: '--salt' },
+};
+
+function MacroRow({ label, color, value, target, digits = 0 }: { label: string; color: string; value: number; target: number | null; digits?: number }) {
   return (
     <div className="mrow" style={{ ['--m' as string]: `var(${color})` }}>
       <span className="nm">{label}</span>
       <span className="v">
-        <b>{r0(value)}</b> <span className="muted">{target ? `/ ${r0(target)} g` : 'g'}</span>
+        <b>{digits ? value.toFixed(digits) : r0(value)}</b> <span className="muted">{target ? `/ ${r0(target)} g` : 'g'}</span>
       </span>
       {target ? (
         <div className="bar" role="img" aria-label={`${Math.round((value / target) * 100)}% of target`}>
@@ -26,6 +35,30 @@ function MacroRow({ label, color, value, target }: { label: string; color: strin
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Modal dialog: Esc, the Done button or a click on the backdrop closes it. */
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => { ref.current?.showModal(); }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="modal"
+      aria-label={title}
+      onClose={onClose}
+      onClick={e => { if (e.target === e.currentTarget) ref.current?.close(); }}
+    >
+      <div className="modal-body">
+        <h2>{title}</h2>
+        {children}
+        <div className="actions">
+          <span className="spacer" />
+          <button type="button" className="btn primary" onClick={() => ref.current?.close()}>Done</button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 
@@ -43,8 +76,13 @@ export function DayView({ date }: { date: string }) {
   const tgt = st.kcal;
   const scale = Math.max(tgt || 0, t.kcal, 1);
   const diff = tgt ? tgt - t.kcal : null;
+  const shown = st.show ?? DEFAULT_SHOWN;
+  const showP = shown.includes('p');
+  // The colour split only makes sense when protein, carbs and fat are all visible.
+  const split = showP && shown.includes('c') && shown.includes('f');
 
   const [q, setQ] = useState('');
+  const [targetsOpen, setTargetsOpen] = useState(false);
   const [quick, setQuick] = useState({ name: '', kcal: '', p: '', c: '', f: '' });
   const [foodText, setFoodText] = useState('');
   const [food, setFood] = useState<Food | null>(null);
@@ -109,28 +147,43 @@ export function DayView({ date }: { date: string }) {
           <span className="of">{tgt ? `of ${r0(tgt)} kcal` : 'kcal'}</span>
           {diff != null && <span className={`left ${diff < 0 ? 'over' : ''}`}>{diff >= 0 ? `${r0(diff)} left` : `${r0(-diff)} over`}</span>}
         </div>
-        <div className="kbar" role="img" aria-label="Calories split by protein, carbs and fat">
-          {seg(t.p * 4, '--p')}
-          {seg(t.c * 4, '--c')}
-          {seg(t.f * 9, '--f')}
+        <div className="kbar" role="img" aria-label={split ? 'Calories split by protein, carbs and fat' : 'Calories eaten'}>
+          {split ? (
+            <>
+              {seg(t.p * 4, '--p')}
+              {seg(t.c * 4, '--c')}
+              {seg(t.f * 9, '--f')}
+            </>
+          ) : (
+            seg(t.kcal, '--accent')
+          )}
           {tgt && t.kcal > tgt ? <span className="tgt" style={{ left: `${(tgt / scale) * 100}%` }} /> : null}
         </div>
-        <div className="kbar-note">Bar shows where the calories come from: protein, carbs, fat.</div>
-        <MacroRow label="Protein" color="--p" value={t.p} target={st.p} />
-        <MacroRow label="Carbs" color="--c" value={t.c} target={st.c} />
-        <MacroRow label="Fat" color="--f" value={t.f} target={st.f} />
-        <p className="extra">
-          Sugar <b>{r1(t.sugar)} g</b> · Fibre <b>{r1(t.fibre)} g</b> · Salt <b>{t.salt.toFixed(2)} g</b>
-        </p>
-        <details className="targets">
-          <summary>Daily targets</summary>
-          <div className="tgrid">
-            {target('kcal', 'Calories')}
-            {target('p', 'Protein (g)')}
-            {target('c', 'Carbs (g)', 'None')}
-            {target('f', 'Fat (g)', 'None')}
+        {shown.length > 0 && (
+          <div className="macros">
+            {shown.map(k => (
+              <MacroRow
+                key={k}
+                label={NUTRIENT_INFO[k].label}
+                color={NUTRIENT_INFO[k].color}
+                value={t[k]}
+                target={k === 'p' || k === 'c' || k === 'f' ? st[k] : null}
+                digits={k === 'salt' ? 2 : k === 'sugar' || k === 'fibre' ? 1 : 0}
+              />
+            ))}
           </div>
-        </details>
+        )}
+        <button type="button" className="linkish targets-btn" onClick={() => setTargetsOpen(true)}>Edit targets</button>
+        {targetsOpen && (
+          <Modal title="Daily targets" onClose={() => setTargetsOpen(false)}>
+            <div className="tgrid">
+              {target('kcal', 'Calories')}
+              {showP && target('p', 'Protein (g)')}
+              {shown.includes('c') && target('c', 'Carbs (g)', 'None')}
+              {shown.includes('f') && target('f', 'Fat (g)', 'None')}
+            </div>
+          </Modal>
+        )}
       </section>
 
       <h3>Eaten</h3>
@@ -142,11 +195,11 @@ export function DayView({ date }: { date: string }) {
               <li className="entry" key={e.id}>
                 <span className="t">
                   {m.name}
-                  {m.gone && <small className="muted"> (meal deleted)</small>}
+                  {m.gone && <small className="muted"> · deleted</small>}
                 </span>
+                <span className="k">{r0(m.kcal)} <small>kcal</small></span>
                 <span className="m">
-                  {r0(m.kcal)} kcal, {r1(m.p)} g protein, {r1(m.c)} g carbs, {r1(m.f)} g fat
-                  {m.g ? `, ${m.quick ? '' : 'about '}${u.fmtAmount(m.g)}` : ''}
+                  {[showP ? `${r0(m.p)} g protein` : '', m.g ? `${m.quick ? '' : '≈ '}${u.fmtAmount(m.g)}` : ''].filter(Boolean).join(' · ')}
                 </span>
                 <span className="ctl">
                   {!m.quick && (
@@ -163,11 +216,11 @@ export function DayView({ date }: { date: string }) {
           })}
         </ul>
       ) : (
-        <p className="empty">Nothing logged for this day yet. Add a food or a meal below.</p>
+        <p className="empty">Nothing logged yet.</p>
       )}
       {!entries.length && prevEntries.length > 0 && (
         <button className="btn" onClick={() => { update(prevEntries.map(e => ({ ...e, id: uid('e') }))); toast('Copied the previous day'); }}>
-          Copy the previous day&apos;s {prevEntries.length} item{prevEntries.length > 1 ? 's' : ''}
+          Copy previous day ({prevEntries.length})
         </button>
       )}
 
@@ -193,7 +246,7 @@ export function DayView({ date }: { date: string }) {
         </div>
         {food && num(amount) ? (
           <p className="hint">
-            {(() => { const m = forAmount(food, u.amountIn(num(amount)!, food.unit)); return `${r0(m.kcal)} kcal, ${r1(m.p)} g protein, ${r1(m.c)} g carbs, ${r1(m.f)} g fat`; })()}
+            {(() => { const m = forAmount(food, u.amountIn(num(amount)!, food.unit)); return `${r0(m.kcal)} kcal${showP ? ` · ${r1(m.p)} g protein` : ''}`; })()}
           </p>
         ) : null}
 
@@ -209,23 +262,23 @@ export function DayView({ date }: { date: string }) {
                     <li key={r.id}>
                       <button onClick={() => add(r)}>
                         <span>{r.name}</span>
-                        <span className="pm">{r0(m.kcal)} kcal, {r1(m.p)} g protein</span>
+                        <span className="pm">{r0(m.kcal)} kcal{showP ? ` · ${r0(m.p)} g protein` : ''}</span>
                       </button>
                     </li>
                   );
                 })
               ) : (
-                <li className="empty" style={{ padding: '12px 14px' }}>No meal matches “{q}”.</li>
+                <li className="empty" style={{ padding: '12px 4px' }}>No match.</li>
               )}
             </ul>
           </>
         ) : (
           <p className="muted">
-            You have no meals yet. <Link className="btn" href="/meals/new">Create your first meal</Link>
+            No meals yet. <Link href="/meals/new">Create one</Link>
           </p>
         )}
         <details className="quick">
-          <summary>Quick add without a meal</summary>
+          <summary>+ Quick add calories</summary>
           <div className="qgrid">
             <label className="fld qn">Name<input className="txt" placeholder="e.g. Lunch out" value={quick.name} onChange={e => setQuick({ ...quick, name: e.target.value })} /></label>
             {(['kcal', 'p', 'c', 'f'] as const).map(k => (
@@ -235,7 +288,7 @@ export function DayView({ date }: { date: string }) {
               </label>
             ))}
           </div>
-          <div className="actions"><button className="btn" onClick={addQuick}>Add to day</button></div>
+          <div className="actions"><button className="btn" onClick={addQuick}>Add</button></div>
         </details>
       </div>
     </>

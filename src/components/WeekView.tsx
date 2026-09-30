@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { addDays, fmtLong, fmtWeekRange, fmtWeekday, parseKey, todayKey, weekStart } from '@/lib/dates';
 import { r0, signed } from '@/lib/format';
 import { dailyAvg, dayTotals, entryInfo } from '@/lib/macros';
+import { DEFAULT_SHOWN } from '@/lib/types';
 import { useUnits } from '@/lib/units';
 
 /** Entries listed per day before the rest collapse into "+N more". */
@@ -18,6 +19,9 @@ export function WeekView({ start }: { start: string }) {
   const today = todayKey();
   const thisWeek = weekStart(today);
   const { kcal: tgt, p: tp } = data.settings;
+  const shown = data.settings.show ?? DEFAULT_SHOWN;
+  const showP = shown.includes('p');
+  const split = showP && shown.includes('c') && shown.includes('f');
 
   const rows = Array.from({ length: 7 }, (_, i) => {
     const k = addDays(start, i);
@@ -48,7 +52,7 @@ export function WeekView({ start }: { start: string }) {
         <Link className="btn quiet icon" href={`/week?start=${addDays(start, 7)}`} aria-label="Next week">›</Link>
       </div>
 
-      <div className="stats">
+      <div className={`stats${showP ? '' : ' two'}`}>
         <div className="stat">
           <div className="k">Average intake</div>
           <div className="v">{aK == null ? '—' : r0(aK)} <small>kcal</small></div>
@@ -58,11 +62,19 @@ export function WeekView({ start }: { start: string }) {
               : 'No days logged'}
           </div>
         </div>
-        <div className="stat">
-          <div className="k">Average protein</div>
-          <div className="v">{aP == null ? '—' : r0(aP)} <small>g</small></div>
-          <div className="s">{logged.length ? `${r0(avg('c'))} g carbs, ${r0(avg('f'))} g fat${tp ? `. Target ${r0(tp)} g` : ''}` : '—'}</div>
-        </div>
+        {showP && (
+          <div className="stat">
+            <div className="k">Average protein</div>
+            <div className="v">{aP == null ? '—' : r0(aP)} <small>g</small></div>
+            <div className="s">
+              {logged.length
+                ? [shown.includes('c') ? `${r0(avg('c'))} g carbs` : '', shown.includes('f') ? `${r0(avg('f'))} g fat` : '', tp ? `target ${r0(tp)} g` : '']
+                    .filter(Boolean)
+                    .join(' · ') || '—'
+                : '—'}
+            </div>
+          </div>
+        )}
         <div className="stat">
           <div className="k">Average weight</div>
           <div className="v">{u.fmtBody(wAvg)} <small>{u.body}</small></div>
@@ -95,10 +107,10 @@ export function WeekView({ start }: { start: string }) {
                         <>
                           <span className="ck">{r0(t.kcal)} <small>kcal</small></span>
                           <span className="wbar">
-                            <span className="fill">{seg(t.p * 4, '--p')}{seg(t.c * 4, '--c')}{seg(t.f * 9, '--f')}</span>
+                            <span className="fill">{split ? <>{seg(t.p * 4, '--p')}{seg(t.c * 4, '--c')}{seg(t.f * 9, '--f')}</> : seg(t.kcal, '--accent')}</span>
                             {tgt ? <span className="tgt" style={{ left: `${(tgt / scale) * 100}%` }} /> : null}
                           </span>
-                          <span className={tp && t.p >= tp ? 'hit' : ''}>{r0(t.p)} g protein</span>
+                          {showP && <span className={tp && t.p >= tp ? 'hit' : ''}>{r0(t.p)} g protein</span>}
                         </>
                       ) : null}
                       {w != null && <span>{u.fmtBody(w)} {u.body}</span>}
@@ -110,10 +122,6 @@ export function WeekView({ start }: { start: string }) {
           })}
         </ol>
       </div>
-      <p className="hint">
-        Averages count only days with food logged. The line on each bar marks your calorie target; protein turns blue on days you hit its target.
-        Select a day to open it.
-      </p>
     </>
   );
 }
