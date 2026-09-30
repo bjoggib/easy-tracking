@@ -7,6 +7,9 @@ import { useStore } from '@/lib/store';
 import { num, r0, r1, uid } from '@/lib/format';
 import { ensureFood, pickMacros } from '@/lib/foods';
 import { MACRO_KEYS, MACRO_LABELS, type MacroKey } from '@/lib/macros';
+import { resizeImage } from '@/lib/images';
+import type { ScannedFood } from '@/lib/label';
+import { supabase, usingSupabase } from '@/lib/supabase';
 import type { Food } from '@/lib/types';
 import { FoodPicker, foodLabel } from './FoodPicker';
 import { unitsFor, useUnits } from '@/lib/units';
@@ -218,12 +221,60 @@ function PhotoButton({ foodId, hasPhoto }: { foodId: string; hasPhoto: boolean }
   );
 }
 
+/** Photo of a nutrition label → values via /api/label. Fills the form; the user reviews and saves. */
+function ScanLabel({ onResult }: { onResult: (r: ScannedFood) => void }) {
+  const { toast } = useStore();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      // Large enough for small print, small enough for a quick upload.
+      const jpeg = await resizeImage(file, 1600, 0.9);
+      const image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(jpeg);
+      });
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (usingSupabase) {
+        const { data } = await supabase().auth.getSession();
+        if (data.session) headers.Authorization = `Bearer ${data.session.access_token}`;
+      }
+      const res = await fetch('/api/label', { method: 'POST', headers, body: JSON.stringify({ image }) });
+      const body = await res.json().catch(() => ({ error: 'Label scanning failed. Try again.' }));
+      if (!res.ok) return toast(body.error ?? 'Label scanning failed. Try again.');
+      onResult(body as ScannedFood);
+    } catch (err) {
+      console.error(err);
+      toast('Label scanning failed. Try again.');
+    } finally {
+      setBusy(false);
+      if (input.current) input.current.value = '';
+    }
+  };
+
+  return (
+    <div className="scan">
+      <input ref={input} type="file" accept="image/*" capture="environment" hidden onChange={e => onFile(e.target.files?.[0])} />
+      <button type="button" className="btn primary" disabled={busy} onClick={() => input.current?.click()}>
+        {busy ? 'Reading the label…' : 'Scan nutrition label'}
+      </button>
+      <span className="hint">Take a photo of the nutrition table; the values fill in below.</span>
+    </div>
+  );
+}
+
 /** Add a food: from Open Food Facts, or by entering the label's values once. */
 function NewFood() {
   const { data, saveFood, toast } = useStore();
   const router = useRouter();
   const [d, setD] = useState<Draft>(blankDraft);
   const [search, setSearch] = useState('');
+  const [scanNote, setScanNote] = useState<string | null>(null);
 
   const save = () => {
     const name = d.name.trim();
@@ -250,7 +301,24 @@ function NewFood() {
         <Link className="btn quiet" href="/foods">‹ My foods</Link>
       </div>
       <h2>New food</h2>
-      <p className="hint">Search Open Food Facts or type a barcode number, or enter the values from the label below.</p>
+      <ScanLabel
+        onResult={r => {
+          setD(cur => ({
+            ...cur,
+            name: r.name || cur.name,
+            brand: r.brand || cur.brand,
+            unit: r.unit,
+            ...(Object.fromEntries(MACRO_KEYS.map(k => [k, String(r.values[k])])) as Record<MacroKey, string>),
+          }));
+          setScanNote(r.notes);
+        }}
+      />
+      {scanNote != null && (
+        <p className="scan-note" role="status">
+          Filled in from the label. Check the values below before saving{scanNote ? `. Note: ${scanNote}` : '.'}
+        </p>
+      )}
+      <p className="hint">Or search Open Food Facts, type a barcode number, or enter the values from the label below.</p>
       <FoodPicker
         label="Search Open Food Facts"
         value={search}

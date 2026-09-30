@@ -162,6 +162,9 @@ details.quick summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .ftable thead th:nth-child(2),.ftable .per100{white-space:nowrap}
 .ftable .per100{display:block;text-align:right;padding-right:10px}
 .ftable .per100 small,.ftable td.calc small{font-weight:400;color:var(--muted)}
+.scan{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:6px 0 4px}
+.scan .hint{margin:0}
+.scan-note{margin:10px 0;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--p) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--p) 30%,var(--line));font-size:.9rem}
 .fhero{display:flex;gap:16px;align-items:center;margin-top:8px}
 .fhero h2{margin:0}
 .btn.photo-btn{padding:4px 0;min-height:32px;margin-top:2px;color:var(--p)}
