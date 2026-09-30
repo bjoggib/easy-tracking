@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { num, r0, r1, uid } from '@/lib/format';
 import { ensureFood, pickMacros } from '@/lib/foods';
-import { forAmount, MACRO_KEYS, MACRO_LABELS, perServing, recipeTotals, scale, type MacroKey } from '@/lib/macros';
+import { forAmount, MACRO_KEYS, MACRO_LABELS, perServing, recipeTotals, type MacroKey } from '@/lib/macros';
 import type { Food, Ingredient, Macros, Recipe } from '@/lib/types';
 import { useUnits, type Units } from '@/lib/units';
 import { FoodPicker, foodLabel, type Picked } from './FoodPicker';
@@ -40,7 +40,7 @@ export function RecipeList() {
                     <Link href={`/meals/${r.id}`}>
                       <span className="rn">{r.name}</span>
                       <span className="rs">
-                        {r0(m.p)} g protein{r.servings !== 1 ? ` · ${r1(r.servings)} servings` : ''}
+                        {r0(m.p)} g protein
                       </span>
                       <span className="rk">{r0(m.kcal)}<small>kcal</small></span>
                     </Link>
@@ -102,7 +102,6 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
   const existing = id ? data.recipes[id] : undefined;
 
   const [name, setName] = useState(existing?.name ?? '');
-  const [servings, setServings] = useState(str(existing?.servings ?? 1));
   const [ings, setIngs] = useState<IngDraft[]>(() =>
     existing?.ingredients.length ? existing.ingredients.map(i => fromIngredient(i, u)) : [blank()],
   );
@@ -118,7 +117,6 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
   }
 
   const t = recipeTotals(ings.map(i => ({ ...i, grams: gramsOf(i, u) })));
-  const s = num(servings) || 1;
   const setIng = (key: string, patch: Partial<IngDraft>) => setIngs(list => list.map(x => (x.key === key ? { ...x, ...patch } : x)));
 
   const pick = (key: string, picked: Picked) => {
@@ -158,7 +156,8 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
     saveRecipe({
       id: existing?.id ?? uid('r'),
       name: n,
-      servings: Math.max(0.1, num(servings) || 1),
+      // A meal is always one serving; older meals saved with more servings keep theirs until edited.
+      servings: 1,
       ingredients,
       updatedAt: now,
     });
@@ -178,16 +177,10 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
     <>
       <Link className="back" href="/meals">← Meals</Link>
       <h2>{existing ? 'Edit meal' : 'New meal'}</h2>
-      <div className="row" style={{ alignItems: 'end' }}>
-        <label className="fld" style={{ flex: 3, minWidth: 200 }}>
-          Name
-          <input className="txt" value={name} placeholder="e.g. Overnight oats" autoFocus={!existing} onChange={e => setName(e.target.value)} />
-        </label>
-        <label className="fld" style={{ flex: 1, minWidth: 110 }}>
-          Servings it makes
-          <input className="txt" inputMode="decimal" value={servings} onChange={e => setServings(e.target.value)} />
-        </label>
-      </div>
+      <label className="fld">
+        Name
+        <input className="txt" value={name} placeholder="e.g. Overnight oats" autoFocus={!existing} onChange={e => setName(e.target.value)} />
+      </label>
 
       <h3>Ingredients</h3>
       {ings.map(row => {
@@ -206,7 +199,7 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
                 <input id={`amt-${row.key}`} className="txt" inputMode="decimal" aria-label={`Amount of ${row.name || 'ingredient'} in ${u.amountUnit(row.unit)}`} placeholder="0" value={row.grams} onChange={e => setIng(row.key, { grams: e.target.value })} />
                 <span>{u.amountUnit(row.unit)}</span>
               </label>
-              <span className="ik">{hasValues(row) && num(row.grams) ? <>{r0(amount.kcal)}<small>kcal</small></> : null}</span>
+              <span className="ik">{hasValues(row) && num(row.grams) ? <>{r0(amount.kcal)} <small>kcal</small><span className="ip">{r1(amount.p)} g protein</span></> : null}</span>
               <button className="btn quiet icon" aria-label={`Remove ${row.name || 'ingredient'}`} onClick={() => setIngs(list => (list.length > 1 ? list.filter(x => x.key !== row.key) : [blank()]))}>×</button>
             </div>
             {hasValues(row) && !row.edit && (
@@ -241,13 +234,21 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
           </div>
         );
       })}
+      {t.kcal > 0 && (
+        <div className="ing-top ing-total">
+          <span>Total</span>
+          <span className="ik">
+            {r0(t.kcal)} <small>kcal</small>
+            <span className="ip">{r1(t.p)} g protein</span>
+          </span>
+        </div>
+      )}
       <div className="actions" style={{ marginTop: 8 }}>
         <button className="btn" onClick={() => setIngs(list => [...list, blank()])}>Add ingredient</button>
       </div>
 
       <MacroTable rows={[
-        { label: 'Whole meal', m: t },
-        { label: 'Per serving', m: scale(t, 1 / s), hl: true },
+        { label: 'Total', m: t },
       ]} />
 
       <div className="actions">

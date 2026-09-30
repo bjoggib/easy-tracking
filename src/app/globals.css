@@ -105,11 +105,11 @@ label.fld input,label.fld select{margin-top:6px;color:var(--ink);font-size:1rem}
 /* Day totals */
 .hero{margin-top:22px}
 .kcal{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.kcal .big{font-weight:600;font-size:clamp(3.2rem,12vw,4.4rem);line-height:.95;letter-spacing:-.045em}
+.kcal .big{font-weight:600;font-size:clamp(1.7rem,6.5vw,2rem);line-height:1.1;letter-spacing:-.025em}
 .kcal .of{color:var(--muted);font-size:1rem}
 .kcal .left{margin-left:auto;font-weight:500;color:var(--accent)}
 .kcal .left.over{color:var(--danger)}
-.kbar{position:relative;display:flex;height:6px;border-radius:3px;background:var(--soft);overflow:hidden;margin:18px 0 20px;gap:2px}
+.kbar{position:relative;display:flex;height:6px;border-radius:3px;background:var(--soft);overflow:hidden;margin:14px 0 20px;gap:2px}
 .kbar i{display:block;height:100%;border-radius:3px}
 .kbar .tgt{position:absolute;top:0;bottom:0;width:2px;background:var(--ink)}
 .macros{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:16px}
@@ -174,12 +174,16 @@ details.quick summary:hover{color:var(--ink)}
 /* Meal editor */
 .ing{padding:12px 0;border-bottom:1px solid var(--line)}
 .ing:first-of-type{border-top:1px solid var(--line)}
-.ing-top{display:grid;grid-template-columns:1fr 110px 56px 36px;gap:8px;align-items:center}
+.ing-top{display:grid;grid-template-columns:1fr 110px 96px 36px;gap:8px;align-items:center}
 .ing-sub{display:flex;gap:10px;flex-wrap:wrap;align-items:baseline;font-size:.8rem;color:var(--muted);margin-top:6px}
 .ing-vals{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px;padding:14px;background:var(--soft);border-radius:var(--radius)}
 .ing-vals input.txt,.ing-vals select.txt{background:var(--surface);min-height:40px;padding:7px 10px}
 .ik{text-align:right;font-weight:600;line-height:1.1}
-.ik small{display:block;font-weight:400;font-size:.72rem;color:var(--muted)}
+.ik small{font-weight:400;font-size:.72rem;color:var(--muted)}
+.ing-total{padding:12px 0;font-weight:600}
+.ing-total > span:first-child{grid-column:1/3}
+.ing-total .ik{grid-column:3}
+.ik .ip{display:block;font-weight:500;font-size:.78rem;color:var(--p);margin-top:2px}
 .amt{position:relative;display:block}
 .amt input{padding-right:36px;text-align:right}
 .amt.wide input{padding-right:52px}
@@ -321,9 +325,11 @@ table.wt tr.sel td{color:var(--ink);font-weight:600}
   .tgrid{grid-template-columns:repeat(2,1fr)}
   .qgrid{grid-template-columns:repeat(4,1fr)}
   .qgrid .qn{grid-column:1/-1}
-  .ing-top{grid-template-columns:1fr 56px 36px}
+  .ing-top{grid-template-columns:1fr 96px 36px}
   .ing-top .fpick{grid-column:1/-1}
   .ing-top .amt{grid-column:1}
+  .ing-total > span:first-child{grid-column:1}
+  .ing-total .ik{grid-column:2}
   .ing-vals,.fgrid{grid-template-columns:repeat(2,1fr)}
   .addfood{grid-template-columns:1fr auto}
   .addfood .fpick{grid-column:1/-1}
