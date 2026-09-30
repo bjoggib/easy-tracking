@@ -14,6 +14,8 @@ export interface Repository {
   deleteRecipe(id: string): Promise<void>;
   upsertFood(food: Food): Promise<void>;
   deleteFood(id: string): Promise<void>;
+  /** Stores a (already resized) JPEG photo for a food and returns a URL to show it. */
+  uploadFoodImage(foodId: string, image: Blob): Promise<string>;
   upsertDay(day: DayLog): Promise<void>;
   deleteDay(date: string): Promise<void>;
   upsertWeight(entry: WeightEntry): Promise<void>;

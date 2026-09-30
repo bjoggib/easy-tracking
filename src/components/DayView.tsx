@@ -8,7 +8,8 @@ import { addDays, fmtLong, todayKey } from '@/lib/dates';
 import { num, r0, r1, uid } from '@/lib/format';
 import { ensureFood } from '@/lib/foods';
 import { dayTotals, entryInfo, forAmount, lastUsed, perServing, zeroMacros } from '@/lib/macros';
-import type { DayEntry, Food, Recipe, Settings } from '@/lib/types';
+import type { DayEntry, Food, Recipe } from '@/lib/types';
+import { useUnits } from '@/lib/units';
 import { FoodPicker, foodLabel } from './FoodPicker';
 import { NumberField } from './NumberField';
 
@@ -32,6 +33,7 @@ const snapOf = (r: Recipe) => ({ name: r.name, ...perServing(r) });
 
 export function DayView({ date }: { date: string }) {
   const { data, setEntries, setTargets, saveFood, toast } = useStore();
+  const u = useUnits();
   const router = useRouter();
   const today = todayKey();
   const entries = data.days[date]?.entries ?? [];
@@ -64,14 +66,15 @@ export function DayView({ date }: { date: string }) {
   const setServings = (id: string, s: number) =>
     update(entries.map(e => (e.id === id ? { ...e, servings: s } : e)));
   const addFood = () => {
-    const g = num(amount);
+    const typed = num(amount);
     if (!food) return toast('Search for a food and pick it from the list.');
-    if (!g || g <= 0) return toast(`Enter how many ${food.unit} you had.`);
+    if (!typed || typed <= 0) return toast(`Enter how many ${u.amountUnit(food.unit)} you had.`);
+    const g = u.amountIn(typed, food.unit);
     update([...entries, { id: uid('e'), recipeId: null, servings: 1, snap: { name: foodLabel(food), ...forAmount(food, g) } }]);
     setFood(null);
     setFoodText('');
     setAmount('');
-    toast(`Added ${r0(g)} ${food.unit} ${food.name}`);
+    toast(`Added ${u.fmtAmount(g, food.unit)} ${food.name}`);
   };
   const addQuick = () => {
     const snap = { ...zeroMacros(), name: quick.name.trim() || 'Quick add', kcal: num(quick.kcal) ?? 0, p: num(quick.p) ?? 0, c: num(quick.c) ?? 0, f: num(quick.f) ?? 0 };
@@ -81,7 +84,7 @@ export function DayView({ date }: { date: string }) {
     toast(`Added ${snap.name}`);
   };
   const seg = (v: number, c: string) => <i style={{ width: `${(v / scale) * 100}%`, background: `var(${c})` }} />;
-  const target = (k: keyof Settings, label: string, placeholder?: string) => (
+  const target = (k: 'kcal' | 'p' | 'c' | 'f', label: string, placeholder?: string) => (
     <label className="fld">
       {label}
       <NumberField value={st[k]} placeholder={placeholder} onCommit={v => setTargets({ [k]: v })} />
@@ -143,7 +146,7 @@ export function DayView({ date }: { date: string }) {
                 </span>
                 <span className="m">
                   {r0(m.kcal)} kcal, {r1(m.p)} g protein, {r1(m.c)} g carbs, {r1(m.f)} g fat
-                  {m.g ? `, ${m.quick ? '' : 'about '}${r0(m.g)} g` : ''}
+                  {m.g ? `, ${m.quick ? '' : 'about '}${u.fmtAmount(m.g)}` : ''}
                 </span>
                 <span className="ctl">
                   {!m.quick && (
@@ -184,13 +187,13 @@ export function DayView({ date }: { date: string }) {
           <label className="amt">
             <input id="day-amount" className="txt" inputMode="decimal" placeholder="0" aria-label="Amount" value={amount}
               onChange={e => setAmount(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addFood(); }} />
-            <span>{food?.unit ?? 'g'}</span>
+            <span>{u.amountUnit(food?.unit)}</span>
           </label>
           <button className="btn primary" onClick={addFood}>Add</button>
         </div>
         {food && num(amount) ? (
           <p className="hint">
-            {(() => { const m = forAmount(food, num(amount)!); return `${r0(m.kcal)} kcal, ${r1(m.p)} g protein, ${r1(m.c)} g carbs, ${r1(m.f)} g fat`; })()}
+            {(() => { const m = forAmount(food, u.amountIn(num(amount)!, food.unit)); return `${r0(m.kcal)} kcal, ${r1(m.p)} g protein, ${r1(m.c)} g carbs, ${r1(m.f)} g fat`; })()}
           </p>
         ) : null}
 

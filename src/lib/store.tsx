@@ -1,7 +1,9 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { resizeImage } from './images';
 import { createRepository, type Repository } from './storage';
+import { usingSupabase } from './supabase';
 import { emptyData, type AppData, type DayEntry, type Food, type Recipe, type Settings } from './types';
 
 type Store = {
@@ -13,6 +15,8 @@ type Store = {
   deleteRecipe: (id: string) => void;
   saveFood: (food: Food) => void;
   deleteFood: (id: string) => void;
+  /** Resizes and uploads a photo, then attaches it to the food. Rejects if the upload fails. */
+  setFoodImage: (id: string, file: File) => Promise<void>;
   setEntries: (date: string, entries: DayEntry[]) => void;
   setWeight: (date: string, field: 'am' | 'pm', value: number | null) => void;
 };
@@ -105,6 +109,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
           d => ({ ...d, foods: { ...d.foods, [food.id]: food } }),
           repo => repo.upsertFood(food),
         ),
+      setFoodImage: async (id, file) => {
+        const repo = repoRef.current;
+        if (!repo) return;
+        // Browser-only storage keeps the photo inline, so keep it smaller there.
+        const image = await resizeImage(file, usingSupabase ? 1200 : 480);
+        const url = await repo.uploadFoodImage(id, image);
+        const food = dataRef.current?.foods[id];
+        if (!food) return;
+        const next = { ...food, image: url, updatedAt: new Date().toISOString() };
+        commit(d => ({ ...d, foods: { ...d.foods, [id]: next } }), r => r.upsertFood(next));
+      },
       deleteFood: id =>
         commit(
           d => {

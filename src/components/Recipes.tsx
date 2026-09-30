@@ -8,6 +8,7 @@ import { num, r0, r1, uid } from '@/lib/format';
 import { ensureFood, pickMacros } from '@/lib/foods';
 import { forAmount, MACRO_KEYS, MACRO_LABELS, perServing, recipeTotals, scale, type MacroKey } from '@/lib/macros';
 import type { Food, Ingredient, Macros, Recipe } from '@/lib/types';
+import { useUnits, type Units } from '@/lib/units';
 import { FoodPicker, foodLabel, type Picked } from './FoodPicker';
 
 export function RecipeList() {
@@ -64,7 +65,20 @@ export function RecipeList() {
   );
 }
 
-type IngDraft = { key: string; name: string; grams: string; foodId?: string; unit: 'g' | 'ml'; edit: boolean } & Record<MacroKey, string>;
+/**
+ * `grams` holds the amount as typed, in the user's units. `orig*` remember a saved amount so an
+ * untouched field keeps its exact grams instead of round-tripping through ounces.
+ */
+type IngDraft = {
+  key: string;
+  name: string;
+  grams: string;
+  origGrams?: number;
+  origText?: string;
+  foodId?: string;
+  unit: 'g' | 'ml';
+  edit: boolean;
+} & Record<MacroKey, string>;
 
 const str = (v: number | undefined) => (v == null ? '' : String(v));
 const noValues = () => Object.fromEntries(MACRO_KEYS.map(k => [k, ''])) as Record<MacroKey, string>;
@@ -72,14 +86,23 @@ const blank = (): IngDraft => ({ key: uid('i'), name: '', grams: '', unit: 'g', 
 const valuesOf = (m: Partial<Macros>) => Object.fromEntries(MACRO_KEYS.map(k => [k, str(m[k])])) as Record<MacroKey, string>;
 const hasValues = (d: IngDraft) => MACRO_KEYS.some(k => d[k] !== '');
 const macrosOf = (d: IngDraft): Macros => pickMacros(Object.fromEntries(MACRO_KEYS.map(k => [k, num(d[k]) ?? 0])));
-const fromIngredient = (i: Ingredient): IngDraft => ({
-  key: uid('i'), name: i.name, grams: str(i.grams), foodId: i.foodId, unit: i.unit ?? 'g', edit: false, ...valuesOf(i),
-});
+const fromIngredient = (i: Ingredient, u: Units): IngDraft => {
+  const text = u.amountField(i.grams, i.unit ?? 'g');
+  return { key: uid('i'), name: i.name, grams: text, origGrams: i.grams, origText: text, foodId: i.foodId, unit: i.unit ?? 'g', edit: false, ...valuesOf(i) };
+};
+const gramsOf = (d: IngDraft, u: Units) =>
+  d.origText != null && d.grams === d.origText ? d.origGrams! : u.amountIn(num(d.grams) ?? 0, d.unit);
 
 /** Units shown in the per-100 value fields. */
 const UNIT: Record<MacroKey, string> = { kcal: 'kcal', p: 'g', c: 'g', f: 'g', sugar: 'g', fibre: 'g', salt: 'g' };
 
 export function RecipeEditor({ id }: { id?: string }) {
+  // Drafts hold amounts in the chosen units, so start fresh if the units change.
+  const u = useUnits();
+  return <MealEditor key={u.system} id={id} u={u} />;
+}
+
+function MealEditor({ id, u }: { id?: string; u: Units }) {
   const { data, saveRecipe, deleteRecipe, saveFood, toast } = useStore();
   const router = useRouter();
   const existing = id ? data.recipes[id] : undefined;
@@ -87,7 +110,7 @@ export function RecipeEditor({ id }: { id?: string }) {
   const [name, setName] = useState(existing?.name ?? '');
   const [servings, setServings] = useState(str(existing?.servings ?? 1));
   const [ings, setIngs] = useState<IngDraft[]>(() =>
-    existing?.ingredients.length ? existing.ingredients.map(fromIngredient) : [blank()],
+    existing?.ingredients.length ? existing.ingredients.map(i => fromIngredient(i, u)) : [blank()],
   );
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -100,7 +123,7 @@ export function RecipeEditor({ id }: { id?: string }) {
     );
   }
 
-  const t = recipeTotals(ings);
+  const t = recipeTotals(ings.map(i => ({ ...i, grams: gramsOf(i, u) })));
   const s = num(servings) || 1;
   const setIng = (key: string, patch: Partial<IngDraft>) => setIngs(list => list.map(x => (x.key === key ? { ...x, ...patch } : x)));
 
@@ -136,7 +159,7 @@ export function RecipeEditor({ id }: { id?: string }) {
         saveFood(food);
         byName.set(label.toLowerCase(), food);
       }
-      return { name: label, grams: num(i.grams) ?? 0, foodId: food.id, unit: i.unit, ...m };
+      return { name: label, grams: gramsOf(i, u), foodId: food.id, unit: i.unit, ...m };
     });
     saveRecipe({
       id: existing?.id ?? uid('r'),
@@ -180,7 +203,7 @@ export function RecipeEditor({ id }: { id?: string }) {
         type a barcode number too.
       </p>
       {ings.map(row => {
-        const amount = forAmount(macrosOf(row), num(row.grams) ?? 0);
+        const amount = forAmount(macrosOf(row), gramsOf(row, u));
         return (
           <div className="ing" key={row.key}>
             <div className="ing-top">
@@ -192,8 +215,8 @@ export function RecipeEditor({ id }: { id?: string }) {
                 onManual={text => setIng(row.key, { name: text, edit: true })}
               />
               <label className="amt">
-                <input id={`amt-${row.key}`} className="txt" inputMode="decimal" aria-label={`Amount of ${row.name || 'ingredient'} in ${row.unit}`} placeholder="0" value={row.grams} onChange={e => setIng(row.key, { grams: e.target.value })} />
-                <span>{row.unit}</span>
+                <input id={`amt-${row.key}`} className="txt" inputMode="decimal" aria-label={`Amount of ${row.name || 'ingredient'} in ${u.amountUnit(row.unit)}`} placeholder="0" value={row.grams} onChange={e => setIng(row.key, { grams: e.target.value })} />
+                <span>{u.amountUnit(row.unit)}</span>
               </label>
               <span className="ik">{hasValues(row) && num(row.grams) ? <>{r0(amount.kcal)}<small>kcal</small></> : null}</span>
               <button className="btn quiet icon" aria-label={`Remove ${row.name || 'ingredient'}`} onClick={() => setIngs(list => (list.length > 1 ? list.filter(x => x.key !== row.key) : [blank()]))}>×</button>
@@ -251,6 +274,7 @@ export function RecipeEditor({ id }: { id?: string }) {
 
 /** Totals table: weight, kcal, then every nutrient in grams. */
 export function MacroTable({ rows }: { rows: { label: string; m: Macros & { g: number }; hl?: boolean }[] }) {
+  const u = useUnits();
   const cols = MACRO_KEYS.filter(k => k !== 'kcal');
   return (
     <div className="totals">
@@ -262,7 +286,7 @@ export function MacroTable({ rows }: { rows: { label: string; m: Macros & { g: n
           {rows.map(({ label, m, hl }) => (
             <tr key={label}>
               <td className={hl ? 'hl' : undefined}>{label}</td>
-              <td>{r0(m.g)} g</td>
+              <td>{u.fmtAmount(m.g)}</td>
               <td className={hl ? 'hl' : undefined}>{r0(m.kcal)}</td>
               {cols.map(k => <td key={k} className={hl && k === 'p' ? 'hl' : undefined}>{k === 'salt' ? m[k].toFixed(2) : r1(m[k])} g</td>)}
             </tr>

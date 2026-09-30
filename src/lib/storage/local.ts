@@ -40,6 +40,15 @@ export class LocalRepository implements Repository {
   deleteRecipe(id: string) { delete this.data.recipes[id]; return this.flush(); }
   upsertFood(f: Food) { this.data.foods[f.id] = { ...f }; return this.flush(); }
   deleteFood(id: string) { delete this.data.foods[id]; return this.flush(); }
+  /** No file storage here, so the photo is kept inline as a data URL (it is small after resizing). */
+  uploadFoodImage(_foodId: string, image: Blob) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(image);
+    });
+  }
   upsertDay(d: DayLog) { this.data.days[d.date] = structuredClone(d); return this.flush(); }
   deleteDay(date: string) { delete this.data.days[date]; return this.flush(); }
   upsertWeight(w: WeightEntry) { this.data.weights[w.date] = { ...w }; return this.flush(); }

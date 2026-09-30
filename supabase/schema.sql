@@ -3,7 +3,8 @@
 
 create table settings (
   user_id uuid primary key references auth.users on delete cascade default auth.uid(),
-  kcal numeric, p numeric, c numeric, f numeric
+  kcal numeric, p numeric, c numeric, f numeric,
+  units text not null default 'metric' check (units in ('metric', 'us'))
 );
 
 create table recipes (
@@ -64,3 +65,5 @@ create policy "own rows" on weights for all using (user_id = auth.uid()) with ch
 
 -- Newer Supabase projects no longer expose new public tables to the Data API automatically.
 grant select, insert, update, delete on settings, recipes, foods, day_logs, weights to authenticated;
+
+-- Food photo storage: also run supabase/003_food_photos.sql.

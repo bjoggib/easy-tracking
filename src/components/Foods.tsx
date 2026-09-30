@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { num, r0, r1, uid } from '@/lib/format';
 import { ensureFood, pickMacros } from '@/lib/foods';
 import { MACRO_KEYS, MACRO_LABELS, type MacroKey } from '@/lib/macros';
 import type { Food } from '@/lib/types';
 import { FoodPicker, foodLabel } from './FoodPicker';
+import { unitsFor, useUnits } from '@/lib/units';
 import { FoodThumb } from './FoodThumb';
 
 export function FoodList() {
@@ -80,8 +81,16 @@ const unitOf = (k: MacroKey) => (k === 'kcal' ? 'kcal' : 'g');
  * text for a saved food, and inputs only while creating one (`onEdit`).
  */
 function NutritionTable({ values, unit, onEdit }: { values: Record<MacroKey, number | string>; unit: 'g' | 'ml'; onEdit?: (k: MacroKey, v: string) => void }) {
-  const [amount, setAmount] = useState('100');
-  const factor = (num(amount) ?? 0) / 100;
+  const u = useUnits();
+  const [amount, setAmount] = useState(u.defaultAmount);
+  const [prevSystem, setPrevSystem] = useState(u.system);
+  if (prevSystem !== u.system) {
+    // Units switched: show the same quantity in the new unit.
+    setPrevSystem(u.system);
+    const grams = num(amount) == null ? null : (u.system === 'us' ? unitsFor('metric') : unitsFor('us')).amountIn(num(amount)!, unit);
+    setAmount(grams == null ? u.defaultAmount : u.amountField(grams, unit));
+  }
+  const factor = u.amountIn(num(amount) ?? 0, unit) / 100;
   return (
     <table className="ftable">
       <thead>
@@ -90,8 +99,8 @@ function NutritionTable({ values, unit, onEdit }: { values: Record<MacroKey, num
           <th scope="col">Per 100 {unit}</th>
           <th scope="col">
             <label className="amt">
-              <input className="txt" inputMode="decimal" aria-label={`Amount in ${unit}`} value={amount} onChange={e => setAmount(e.target.value)} onFocus={e => e.target.select()} />
-              <span>{unit}</span>
+              <input className="txt" inputMode="decimal" aria-label={`Amount in ${u.amountUnit(unit)}`} value={amount} onChange={e => setAmount(e.target.value)} onFocus={e => e.target.select()} />
+              <span>{u.amountUnit(unit)}</span>
             </label>
           </th>
         </tr>
@@ -155,13 +164,14 @@ function FoodView({ id }: { id: string }) {
         <Link className="btn quiet" href="/foods">‹ My foods</Link>
       </div>
       <div className="fhero">
-        {food.image && <FoodThumb src={food.image} size={88} zoomable alt={foodLabel(food)} />}
+        <FoodThumb key={food.image} src={food.image} size={88} zoomable alt={foodLabel(food)} />
         <div>
           <h2>{food.name}</h2>
           <p className="muted">
             {food.brand ? `${food.brand} · ` : ''}
             {food.source === 'off' ? 'From Open Food Facts' : 'Entered by hand'}
           </p>
+          <PhotoButton foodId={food.id} hasPhoto={!!food.image} />
         </div>
       </div>
       <h3>Nutrition</h3>
@@ -172,6 +182,38 @@ function FoodView({ id }: { id: string }) {
         <span className="spacer" />
         <button className="btn danger" onClick={remove}>{confirmDel ? 'Tap again to delete' : 'Delete food'}</button>
       </div>
+    </>
+  );
+}
+
+/** Picks a photo (camera or library on phones), then uploads it for the food. */
+function PhotoButton({ foodId, hasPhoto }: { foodId: string; hasPhoto: boolean }) {
+  const { setFoodImage, toast } = useStore();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return toast('Pick an image file.');
+    setBusy(true);
+    try {
+      await setFoodImage(foodId, file);
+      toast('Photo saved');
+    } catch (err) {
+      console.error(err);
+      toast('The photo could not be saved. Try again, or try a different photo.');
+    } finally {
+      setBusy(false);
+      if (input.current) input.current.value = '';
+    }
+  };
+
+  return (
+    <>
+      <input ref={input} type="file" accept="image/*" hidden onChange={e => onFile(e.target.files?.[0])} />
+      <button type="button" className="btn quiet photo-btn" disabled={busy} onClick={() => input.current?.click()}>
+        {busy ? 'Uploading…' : hasPhoto ? 'Change photo' : 'Add photo'}
+      </button>
     </>
   );
 }

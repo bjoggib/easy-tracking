@@ -3,15 +3,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { addDays, daysBetween, fmtRow, fmtShort, todayKey } from '@/lib/dates';
-import { kg, signed } from '@/lib/format';
+import { signed } from '@/lib/format';
 import { dailyAvg, rolling } from '@/lib/macros';
 import type { WeightEntry } from '@/lib/types';
+import { useUnits, type Units } from '@/lib/units';
 import { NumberField } from './NumberField';
 
 type Range = '30' | '90' | 'all';
 
 export function WeightView() {
   const { data, setWeight, toast } = useStore();
+  const u = useUnits();
   const [date, setDate] = useState(todayKey());
   const [range, setRange] = useState<Range>('30');
   const w = data.weights[date];
@@ -24,9 +26,12 @@ export function WeightView() {
   const recent = days.slice(-21).reverse();
 
   const commit = (field: 'am' | 'pm') => (v: number | null) => {
-    if (v != null && (v < 20 || v > 400)) return toast('That weight looks off. Enter it in kilograms.');
-    setWeight(date, field, v);
+    const kg = v == null ? null : u.bodyIn(v);
+    if (kg != null && (kg < 20 || kg > 400)) return toast(`That weight looks off. Enter it in ${u.body === 'lb' ? 'pounds' : 'kilograms'}.`);
+    setWeight(date, field, kg);
   };
+  /** Stored kg shown in the chosen unit, rounded so pounds don't show float noise. */
+  const shown = (kg: number | null | undefined) => (kg == null ? null : Number(u.bodyOut(kg).toFixed(u.body === 'lb' ? 1 : 3)));
 
   return (
     <>
@@ -37,12 +42,12 @@ export function WeightView() {
           <input className="txt" type="date" value={date} onChange={e => e.target.value && setDate(e.target.value)} />
         </label>
         <label className="fld">
-          Morning (kg)
-          <NumberField key={`am-${date}`} value={w?.am ?? null} placeholder="—" onCommit={commit('am')} />
+          Morning ({u.body})
+          <NumberField key={`am-${date}-${u.system}`} value={shown(w?.am)} placeholder="—" onCommit={commit('am')} />
         </label>
         <label className="fld">
-          Evening (kg)
-          <NumberField key={`pm-${date}`} value={w?.pm ?? null} placeholder="—" onCommit={commit('pm')} />
+          Evening ({u.body})
+          <NumberField key={`pm-${date}-${u.system}`} value={shown(w?.pm)} placeholder="—" onCommit={commit('pm')} />
         </label>
       </div>
       <p className="hint">Saves as you leave each field. Daily average uses whichever readings exist for that day.</p>
@@ -50,17 +55,17 @@ export function WeightView() {
       <div className="stats">
         <div className="stat">
           <div className="k">Daily average</div>
-          <div className="v">{kg(latest ? dailyAvg(data.weights, latest) : null)} <small>kg</small></div>
+          <div className="v">{u.fmtBody(latest ? dailyAvg(data.weights, latest) : null)} <small>{u.body}</small></div>
           <div className="s">{latest ? fmtShort(latest) : 'No readings yet'}</div>
         </div>
         <div className="stat">
           <div className="k">7-day average</div>
-          <div className="v">{kg(roll?.avg)} <small>kg</small></div>
+          <div className="v">{u.fmtBody(roll?.avg)} <small>{u.body}</small></div>
           <div className="s">{roll ? `from ${roll.n} of the last 7 days` : '—'}</div>
         </div>
         <div className="stat">
           <div className="k">vs a week earlier</div>
-          <div className="v">{delta == null ? '—' : signed(delta, 2)} <small>kg</small></div>
+          <div className="v">{delta == null ? '—' : signed(u.bodyOut(delta), u.bodyDigits)} <small>{u.body}</small></div>
           <div className="s">change in the 7-day average</div>
         </div>
       </div>
@@ -73,7 +78,7 @@ export function WeightView() {
           ))}
         </div>
       </div>
-      <WeightChart weights={data.weights} range={range} />
+      <WeightChart weights={data.weights} range={range} u={u} />
       <div className="legend"><span className="dots">Daily average</span><span>7-day average</span></div>
 
       {recent.length > 0 && (
@@ -91,8 +96,8 @@ export function WeightView() {
                   return (
                     <tr key={k} className={`pick ${k === date ? 'sel' : ''}`} tabIndex={0} onClick={pick}
                       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } }}>
-                      <td>{fmtRow(k)}</td><td>{kg(x.am)}</td><td>{kg(x.pm)}</td>
-                      <td>{kg(dailyAvg(data.weights, k))}</td><td>{kg(rolling(data.weights, k)?.avg)}</td>
+                      <td>{fmtRow(k)}</td><td>{u.fmtBody(x.am)}</td><td>{u.fmtBody(x.pm)}</td>
+                      <td>{u.fmtBody(dailyAvg(data.weights, k))}</td><td>{u.fmtBody(rolling(data.weights, k)?.avg)}</td>
                     </tr>
                   );
                 })}
@@ -108,7 +113,7 @@ export function WeightView() {
 
 const STEPS = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10];
 
-function WeightChart({ weights, range }: { weights: Record<string, WeightEntry>; range: Range }) {
+function WeightChart({ weights, range, u }: { weights: Record<string, WeightEntry>; range: Range; u: Units }) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
 
@@ -129,10 +134,11 @@ function WeightChart({ weights, range }: { weights: Record<string, WeightEntry>;
   let start = range === 'all' ? days[0] : addDays(end, -(Number(range) - 1));
   if (start < days[0]) start = days[0];
   const span = Math.max(1, daysBetween(start, end));
-  const pts = days.filter(k => k >= start).map(k => [k, dailyAvg(weights, k)!] as const);
+  const pts = days.filter(k => k >= start).map(k => [k, u.bodyOut(dailyAvg(weights, k)!)] as const);
   const roll = Array.from({ length: span + 1 }, (_, i) => {
     const k = addDays(start, i);
-    return [k, rolling(weights, k)?.avg ?? null] as const;
+    const avg = rolling(weights, k)?.avg;
+    return [k, avg == null ? null : u.bodyOut(avg)] as const;
   });
   const vals = [...pts.map(p => p[1]), ...roll.flatMap(r => (r[1] == null ? [] : [r[1]]))];
   let lo = Math.min(...vals), hi = Math.max(...vals);
@@ -171,7 +177,7 @@ function WeightChart({ weights, range }: { weights: Record<string, WeightEntry>;
         ))}
         {pts.map(([k, v]) => (
           <circle key={k} cx={x(k)} cy={y(v)} r={span > 120 ? 1.8 : 3} fill="var(--muted)" opacity={0.7}>
-            <title>{`${fmtShort(k)}: ${v.toFixed(2)} kg`}</title>
+            <title>{`${fmtShort(k)}: ${v.toFixed(u.bodyDigits)} ${u.body}`}</title>
           </circle>
         ))}
         <path d={path} fill="none" stroke="var(--p)" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />

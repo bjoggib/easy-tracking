@@ -20,6 +20,15 @@ export function Header() {
       <div className="head">
         <Link href="/day" className="brand">Easy Tracking</Link>
         <span className="sync" aria-live="polite">
+          {store && (
+            <span className="seg units" role="group" aria-label="Units">
+              {(['metric', 'us'] as const).map(u => (
+                <button key={u} type="button" aria-pressed={(store.data.settings.units ?? 'metric') === u} onClick={() => store.setTargets({ units: u })}>
+                  {u === 'metric' ? 'kg · g' : 'lb · oz'}
+                </button>
+              ))}
+            </span>
+          )}
           {store?.storageLabel}
           {usingSupabase && (
             <>

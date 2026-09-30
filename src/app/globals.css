@@ -30,7 +30,8 @@ a{color:var(--p)}
 header.site{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
 .head{max-width:760px;margin:0 auto;padding:14px 18px 0;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .brand{font-family:var(--display);font-weight:800;font-size:1.35rem;letter-spacing:-.02em;color:var(--ink);text-decoration:none}
-.sync{font-size:.8rem;color:var(--muted)}
+.sync{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.seg.units button{min-height:28px;padding:3px 9px;font-size:.78rem}
 .signin{max-width:420px}
 .signin .btn.google{width:100%;justify-content:center;gap:10px;min-height:46px;font-weight:600}
 .signin form .btn{width:100%;justify-content:center}
@@ -157,10 +158,14 @@ details.quick summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .ftable .amt input{min-height:40px;padding-left:10px}
 .ftable .amt span{font-size:.78rem}
 .ftable thead th:nth-child(2){text-align:right;padding-right:10px}
+.ftable thead .amt{width:112px;margin-left:auto}
+.ftable thead th:nth-child(2),.ftable .per100{white-space:nowrap}
 .ftable .per100{display:block;text-align:right;padding-right:10px}
 .ftable .per100 small,.ftable td.calc small{font-weight:400;color:var(--muted)}
 .fhero{display:flex;gap:16px;align-items:center;margin-top:8px}
 .fhero h2{margin:0}
+.btn.photo-btn{padding:4px 0;min-height:32px;margin-top:2px;color:var(--p)}
+.btn.photo-btn:hover{background:none;text-decoration:underline}
 .fhero p{margin:2px 0 0}
 .ftable td.calc{text-align:right;font-weight:600;white-space:nowrap}
 .ftable td.calc small{font-weight:400;color:var(--muted)}

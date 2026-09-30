@@ -3,6 +3,9 @@ import { emptyData, type AppData, type DayLog, type Food, type Recipe, type Sett
 import { LOCAL_KEY, LocalRepository } from './local';
 import type { Repository } from './repository';
 
+/** Public storage bucket for food photos; see supabase/003_food_photos.sql. */
+const IMAGE_BUCKET = 'food-images';
+
 /** Set once browser data has been copied up, so it is never imported twice. */
 const IMPORTED_KEY = 'easy-tracking-imported';
 
@@ -22,7 +25,7 @@ export class SupabaseRepository implements Repository {
 
   async load(): Promise<AppData> {
     const [settings, recipes, foods, days, weights] = await Promise.all([
-      this.db.from('settings').select('kcal, p, c, f').maybeSingle().then(ok<Settings | null>),
+      this.db.from('settings').select('kcal, p, c, f, units').maybeSingle().then(ok<Settings | null>),
       this.db.from('recipes').select('id, name, servings, ingredients, updated_at').then(ok<RecipeRow[]>),
       this.db.from('foods').select(FOOD_COLUMNS).then(ok<FoodRow[]>),
       this.db.from('day_logs').select('date, entries').then(ok<DayLog[]>),
@@ -60,7 +63,7 @@ export class SupabaseRepository implements Repository {
   }
 
   async saveSettings(s: Settings) {
-    ok(await this.db.from('settings').upsert({ kcal: s.kcal, p: s.p, c: s.c, f: s.f }));
+    ok(await this.db.from('settings').upsert({ kcal: s.kcal, p: s.p, c: s.c, f: s.f, units: s.units ?? 'metric' }));
   }
   async upsertRecipe(r: Recipe) {
     ok(await this.db.from('recipes').upsert(toRow(r)));
@@ -73,6 +76,24 @@ export class SupabaseRepository implements Repository {
   }
   async deleteFood(id: string) {
     ok(await this.db.from('foods').delete().eq('id', id));
+    // Remove an uploaded photo too, if there is one; a missing file is not an error.
+    const path = await this.imagePath(id).catch(() => null);
+    if (path) await this.db.storage.from(IMAGE_BUCKET).remove([path]);
+  }
+  async uploadFoodImage(foodId: string, image: Blob) {
+    const path = await this.imagePath(foodId);
+    const { error } = await this.db.storage.from(IMAGE_BUCKET).upload(path, image, { upsert: true, contentType: 'image/jpeg' });
+    if (error) throw error;
+    const { data } = this.db.storage.from(IMAGE_BUCKET).getPublicUrl(path);
+    // Same path on replace, so bust caches with a version.
+    return `${data.publicUrl}?v=${Date.now()}`;
+  }
+  /** Each user's photos live in a folder named after their user id (enforced by storage policies). */
+  private async imagePath(foodId: string) {
+    const { data } = await this.db.auth.getSession();
+    const uid = data.session?.user.id;
+    if (!uid) throw new Error('Not signed in');
+    return `${uid}/${foodId}.jpg`;
   }
   async upsertDay(d: DayLog) {
     ok(await this.db.from('day_logs').upsert({ date: d.date, entries: d.entries }));

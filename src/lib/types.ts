@@ -47,7 +47,14 @@ export type DayLog = { date: string; entries: DayEntry[] };
 
 export type WeightEntry = { date: string; am: number | null; pm: number | null };
 
-export type Settings = { kcal: number | null; p: number | null; c: number | null; f: number | null };
+export type Settings = {
+  kcal: number | null;
+  p: number | null;
+  c: number | null;
+  f: number | null;
+  /** Display units; missing in data saved before the option existed (means metric). */
+  units?: 'metric' | 'us';
+};
 
 export type AppData = {
   settings: Settings;
@@ -57,7 +64,7 @@ export type AppData = {
   weights: Record<string, WeightEntry>;
 };
 
-export const DEFAULT_SETTINGS: Settings = { kcal: 2050, p: 150, c: null, f: null };
+export const DEFAULT_SETTINGS: Settings = { kcal: 2050, p: 150, c: null, f: null, units: 'metric' };
 
 export const emptyData = (): AppData => ({
   settings: { ...DEFAULT_SETTINGS },

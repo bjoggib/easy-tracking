@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { addDays, fmtLong, fmtWeekRange, fmtWeekday, parseKey, todayKey, weekStart } from '@/lib/dates';
-import { kg, r0, signed } from '@/lib/format';
+import { r0, signed } from '@/lib/format';
 import { dailyAvg, dayTotals, entryInfo } from '@/lib/macros';
+import { useUnits } from '@/lib/units';
 
 /** Entries listed per day before the rest collapse into "+N more". */
 const MAX_ITEMS = 5;
@@ -13,6 +14,7 @@ const mean = (a: number[]) => (a.length ? a.reduce((s, v) => s + v, 0) / a.lengt
 
 export function WeekView({ start }: { start: string }) {
   const { data } = useStore();
+  const u = useUnits();
   const today = todayKey();
   const thisWeek = weekStart(today);
   const { kcal: tgt, p: tp } = data.settings;
@@ -63,9 +65,9 @@ export function WeekView({ start }: { start: string }) {
         </div>
         <div className="stat">
           <div className="k">Average weight</div>
-          <div className="v">{kg(wAvg)} <small>kg</small></div>
+          <div className="v">{u.fmtBody(wAvg)} <small>{u.body}</small></div>
           <div className="s">
-            {wDelta != null ? `${signed(wDelta, 2)} kg vs previous week` : wAvg != null ? 'No readings the week before' : 'No readings this week'}
+            {wDelta != null ? `${signed(u.bodyOut(wDelta), u.bodyDigits)} ${u.body} vs previous week` : wAvg != null ? 'No readings the week before' : 'No readings this week'}
           </div>
         </div>
       </div>
@@ -99,7 +101,7 @@ export function WeekView({ start }: { start: string }) {
                           <span className={tp && t.p >= tp ? 'hit' : ''}>{r0(t.p)} g protein</span>
                         </>
                       ) : null}
-                      {w != null && <span>{w.toFixed(2)} kg</span>}
+                      {w != null && <span>{u.fmtBody(w)} {u.body}</span>}
                     </span>
                   ) : null}
                 </Link>

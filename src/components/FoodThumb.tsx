@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-/** Open Food Facts serves each photo at .100/.200/.400.jpg and the original at .full.jpg. */
-const sized = (src: string, size: '400' | 'full') => src.replace(/\.(\d+|full)\.jpg$/, `.${size}.jpg`);
+/**
+ * Open Food Facts serves each photo at .100/.200/.400.jpg and the original at .full.jpg.
+ * Uploaded photos have one size, so they are returned as is.
+ */
+const sized = (src: string, size: '400' | 'full') =>
+  src.startsWith('https://images.openfoodfacts.org/') ? src.replace(/\.(\d+|full)\.jpg$/, `.${size}.jpg`) : src;
 
 /**
  * Product photo, or a neutral placeholder when there is none or it fails to load
