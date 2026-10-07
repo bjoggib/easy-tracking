@@ -90,20 +90,23 @@ const gramsOf = (d: IngDraft, u: Units) =>
 /** Units shown in the per-100 value fields. */
 const UNIT: Record<MacroKey, string> = { kcal: 'kcal', p: 'g', c: 'g', f: 'g', sugar: 'g', fibre: 'g', salt: 'g' };
 
-export function RecipeEditor({ id }: { id?: string }) {
+/** `copyOf` starts a new meal prefilled from another one. */
+export function RecipeEditor({ id, copyOf }: { id?: string; copyOf?: string }) {
   // Drafts hold amounts in the chosen units, so start fresh if the units change.
   const u = useUnits();
-  return <MealEditor key={u.system} id={id} u={u} />;
+  return <MealEditor key={u.system} id={id} copyOf={copyOf} u={u} />;
 }
 
-function MealEditor({ id, u }: { id?: string; u: Units }) {
+function MealEditor({ id, copyOf, u }: { id?: string; copyOf?: string; u: Units }) {
   const { data, saveRecipe, deleteRecipe, saveFood, toast } = useStore();
   const router = useRouter();
   const existing = id ? data.recipes[id] : undefined;
+  const original = copyOf ? data.recipes[copyOf] : undefined;
+  const source = existing ?? original;
 
-  const [name, setName] = useState(existing?.name ?? '');
+  const [name, setName] = useState(existing?.name ?? (original ? `${original.name} (copy)` : ''));
   const [ings, setIngs] = useState<IngDraft[]>(() =>
-    existing?.ingredients.length ? existing.ingredients.map(i => fromIngredient(i, u)) : [blank()],
+    source?.ingredients.length ? source.ingredients.map(i => fromIngredient(i, u)) : [blank()],
   );
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -176,7 +179,7 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
   return (
     <>
       <Link className="back" href="/meals">← Meals</Link>
-      <h2>{existing ? 'Edit meal' : 'New meal'}</h2>
+      <h2>{existing ? 'Edit meal' : original ? 'Copy meal' : 'New meal'}</h2>
       <label className="fld">
         Name
         <input className="txt" value={name} placeholder="e.g. Overnight oats" autoFocus={!existing} onChange={e => setName(e.target.value)} />
@@ -255,6 +258,7 @@ function MealEditor({ id, u }: { id?: string; u: Units }) {
         <button className="btn primary" onClick={save}>Save meal</button>
         <Link className="btn quiet" href="/meals">Cancel</Link>
         <span className="spacer" />
+        {existing && <Link className="btn quiet" href={`/meals/new?from=${existing.id}`}>Make a copy</Link>}
         {existing && <button className="btn danger" onClick={remove}>{confirmDel ? 'Tap again to delete' : 'Delete meal'}</button>}
       </div>
     </>
